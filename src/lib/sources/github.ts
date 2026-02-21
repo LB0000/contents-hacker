@@ -26,7 +26,17 @@ export async function fetchGitHub(limit: number): Promise<NormalizedItem[]> {
   const json = await res.json();
   const repos: GHRepo[] = json?.items ?? [];
 
-  return repos.map((repo) => ({
+  const MIN_STARS = 5;
+  const NOISE_KEYWORDS = ["clone", "tutorial", "template"];
+
+  return repos
+    .filter((repo) => {
+      if (repo.stargazers_count < MIN_STARS) return false;
+      const desc = (repo.description ?? "").toLowerCase();
+      if (NOISE_KEYWORDS.some((kw) => desc.includes(kw))) return false;
+      return true;
+    })
+    .map((repo) => ({
     id: `gh-${repo.id}`,
     source: "github" as const,
     title_en: repo.full_name,

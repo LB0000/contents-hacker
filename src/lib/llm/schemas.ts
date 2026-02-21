@@ -20,8 +20,6 @@ export const EvalItemSchema = z.object({
   jpCompetitors: z.array(z.string()),
 });
 
-export const EvalResponseSchema = z.array(EvalItemSchema);
-
 /** LLM 2回目: トレース計画 の1件分 */
 export const MvpPlanSchema = z.object({
   id: z.string(),

@@ -43,8 +43,15 @@ export async function fetchHackerNews(limit: number): Promise<NormalizedItem[]> 
 
   const items = await fetchInChunks(sliced);
 
+  const HN_NOISE_PREFIXES = ["Ask HN:", "Tell HN:"];
+
   return items
     .filter((it): it is HNItem => it !== null && it.type === "story" && !!it.title)
+    .filter((it) => {
+      if (HN_NOISE_PREFIXES.some((p) => it.title!.startsWith(p))) return false;
+      if (!it.url) return false; // opinion/self-post without external URL
+      return true;
+    })
     .map((it) => ({
       id: `hn-${it.id}`,
       source: "hackernews" as const,

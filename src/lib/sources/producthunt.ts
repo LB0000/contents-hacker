@@ -39,7 +39,16 @@ export async function fetchProductHunt(limit: number): Promise<NormalizedItem[]>
   const xml = await res.text();
   const rssItems = parseRssItems(xml);
 
-  return rssItems.slice(0, limit).map((item, i) => ({
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+  return rssItems
+    .slice(0, limit)
+    .filter((item) => {
+      if (!item.pubDate) return true;
+      const published = new Date(item.pubDate).getTime();
+      return !isNaN(published) && published >= sevenDaysAgo;
+    })
+    .map((item, i) => ({
     id: `ph-${item.link.split("/").pop() || String(i)}`,
     source: "producthunt" as const,
     title_en: item.title,

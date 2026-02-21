@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NormalizedItem, Candidate, MvpPlan } from "../types";
-import { EvalResponseSchema, MvpPlansResponseSchema, EvalItem } from "./schemas";
+import { EvalItemSchema, MvpPlansResponseSchema, EvalItem } from "./schemas";
 
 function extractJson(text: string): string {
   // まずJSON配列の開始/終了位置を探す
@@ -21,24 +21,11 @@ function callClaude(client: Anthropic, prompt: string, maxTokens: number) {
   });
 }
 
-// ---------- 1回目: 翻訳 + 関門 + 採点 + 競合チェック ----------
+// ---------- 評価プロンプト生成 ----------
 
-export async function evaluateAll(
-  client: Anthropic,
-  items: NormalizedItem[]
-): Promise<{ candidates: Candidate[]; errors: string[] }> {
-  const errors: string[] = [];
-
-  const input = items.map((it, i) => ({
-    index: i,
-    title_en: it.title_en,
-    desc_en: it.desc_en.slice(0, 200),
-    tags: it.tags.slice(0, 8),
-    source: it.source,
-  }));
-
-  const prompt = `あなたは海外プロダクトの日本トレース（ローカライズ再現）の専門家です。
-以下の${items.length}件のプロダクト/トピックを「個人開発者が日本市場向けにバイブコーディングで最速トレースできるか」の観点で評価してください。
+function buildEvalPrompt(itemCount: number, inputJson: string): string {
+  return `あなたは海外プロダクトの日本トレース（ローカライズ再現）の専門家です。
+以下の${itemCount}件のプロダクト/トピックを「個人開発者が日本市場向けにバイブコーディングで最速トレースできるか」の観点で評価してください。
 
 各アイテムについて:
 1. title_ja: タイトルの日本語訳
@@ -46,29 +33,95 @@ export async function evaluateAll(
 3. gate: { pass: boolean, reason_ja: string }
    - PASS: Webアプリ/SaaSとして個人開発でトレース可能 & 日本で未展開 or 弱い
    - FAIL: 純粋なニュース/意見記事、日本で大手が展開済み、ハードウェア依存、規制が厳しい、トレース不可能
+   Examples:
+   - PASS: "CalSync - Calendar sharing tool for teams" → Web SaaS, 日本に強い競合なし, 数日で構築可能
+   - FAIL: "Why AI will replace developers" → 意見記事であり、プロダクトではない
+   - FAIL: "Notion AI updates" → Notionは日本で大手が展開済み
 4. scores (gate.pass=true のみ、falseならnull):
-   - traceSpeed: { score: 0-5, reason_ja } — トレース速度: バイブコーディングで何日で日本版MVPを作れるか (5=1-3日, 4=1週間, 3=2週間, 2=1ヶ月, 1=数ヶ月, 0=不可能)
+   - traceSpeed: { score: 0-5, reason_ja } — トレース速度: バイブコーディングで何日で日本版MVPを作れるか (5=1-3日, 4=1週間, 3=2週間, 2=1ヶ月, 1=数ヶ月, 0=不可能). 前提: Next.js + Stripe + Vercel, TypeScript, 開発者1名.
    - jpDemand: { score: 0-5, reason_ja } — 日本需要: 日本市場に同等の課題・ニーズがあるか (5=明確に大きい, 0=需要なし)
    - jpGap: { score: 0-5, reason_ja } — 日本空白度: 日本に同様のサービスが存在しないか (5=完全空白, 3=弱い競合あり, 0=大手が展開済み)。jpCompetitors の内容を根拠にスコアを判定すること。
    - riskLow: { score: 0-5, reason_ja } — リスク低: 法規制・API依存・技術的リスクが低いか (5=リスクなし, 0=高リスク)
-5. jpCompetitors: string[] — 日本で同様のサービスを提供している既知の競合を最大3つ列挙。なければ空配列。
+5. jpCompetitors: string[] — 日本で同様のサービスを提供している既知の競合を最大3つ列挙。なければ空配列。確信がある場合のみ列挙し、推測や存在が不確かなサービスは含めないこと。
 
 JSON配列のみ返してください（マークダウンフェンス不要）:
 [{"index":0,"title_ja":"...","desc_ja":"...","gate":{"pass":true,"reason_ja":"..."},"scores":{"traceSpeed":{"score":4,"reason_ja":"..."},"jpDemand":{"score":3,"reason_ja":"..."},"jpGap":{"score":5,"reason_ja":"..."},"riskLow":{"score":4,"reason_ja":"..."}},"jpCompetitors":["サービスA","サービスB"]}]
 
 Items:
-${JSON.stringify(input)}`;
+${inputJson}`;
+}
 
-  const message = await callClaude(client, prompt, 8192);
+// ---------- 1回目: 翻訳 + 関門 + 採点 + 競合チェック (2バッチ並列) ----------
+
+export async function evaluateAll(
+  client: Anthropic,
+  items: NormalizedItem[]
+): Promise<{ candidates: Candidate[]; errors: string[] }> {
+  const mid = Math.ceil(items.length / 2);
+  const batch1 = items.slice(0, mid);
+  const batch2 = items.slice(mid);
+
+  const [result1, result2] = await Promise.all([
+    evaluateBatch(client, batch1, 0),
+    evaluateBatch(client, batch2, mid),
+  ]);
+
+  const errors = [...result1.errors, ...result2.errors];
+  const candidates = [...result1.candidates, ...result2.candidates];
+
+  // D2: 評価失敗率の検出
+  const fallbackCount = candidates.filter(
+    (c) => c.gate.reason_ja === "評価に失敗しました"
+  ).length;
+  if (items.length > 0 && fallbackCount / items.length > 0.2) {
+    errors.push(
+      `評価失敗率が高い: ${fallbackCount}/${items.length}件 (${Math.round((fallbackCount / items.length) * 100)}%)。結果の信頼性が低い可能性があります。`
+    );
+  }
+
+  return { candidates, errors };
+}
+
+async function evaluateBatch(
+  client: Anthropic,
+  items: NormalizedItem[],
+  indexOffset: number
+): Promise<{ candidates: Candidate[]; errors: string[] }> {
+  const errors: string[] = [];
+  if (items.length === 0) return { candidates: [], errors };
+
+  const input = items.map((it, i) => ({
+    index: i + indexOffset,
+    title_en: it.title_en,
+    desc_en: it.desc_en.slice(0, 200),
+    tags: it.tags.slice(0, 8),
+    source: it.source,
+  }));
+
+  const prompt = buildEvalPrompt(items.length, JSON.stringify(input));
+  const message = await callClaude(client, prompt, 4096);
   const text = message.content
     .filter((b) => b.type === "text")
     .map((b) => b.text)
     .join("");
 
-  let parsed: EvalItem[];
+  let parsed: EvalItem[] = [];
   try {
     const raw = JSON.parse(extractJson(text));
-    parsed = EvalResponseSchema.parse(raw);
+    if (!Array.isArray(raw)) throw new Error("LLM response is not an array");
+
+    let failCount = 0;
+    for (const item of raw) {
+      const result = EvalItemSchema.safeParse(item);
+      if (result.success) {
+        parsed.push(result.data);
+      } else {
+        failCount++;
+      }
+    }
+    if (failCount > 0) {
+      errors.push(`${raw.length}件中${failCount}件のバリデーション失敗（フォールバック適用）`);
+    }
   } catch (e) {
     errors.push(`LLM JSON検証エラー: ${e instanceof Error ? e.message : String(e)}`);
     return {
@@ -78,7 +131,7 @@ ${JSON.stringify(input)}`;
   }
 
   const candidates: Candidate[] = items.map((it, i) => {
-    const ev = parsed.find((p) => p.index === i);
+    const ev = parsed.find((p) => p.index === i + indexOffset);
     if (!ev) return fallbackCandidate(it);
 
     const scores = ev.scores;
@@ -145,7 +198,7 @@ export async function generateMvpPlans(
   }));
 
   const prompt = `あなたは海外プロダクトの日本トレース（ローカライズ再現）の専門家です。
-以下の上位3件について、個人開発者がバイブコーディングで日本版を最速ローンチするための具体的な計画を作成してください。
+以下の上位${top3.length}件について、個人開発者がバイブコーディングで日本版を最速ローンチするための具体的な計画を作成してください。
 
 JSON配列のみ返してください（マークダウンフェンス不要）:
 [{
