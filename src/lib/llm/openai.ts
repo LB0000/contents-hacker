@@ -6,6 +6,14 @@ import { EvalItemSchema, MvpPlanSchema, PairwiseItemSchema, EvalItem } from "./s
 const MODEL = process.env.LLM_MODEL || "gpt-4o-mini";
 const MAX_USER_CONTEXT = 500;
 
+/** LLMがダブルシリアライズした配列要素を修復する */
+function unwrapItem(item: unknown): unknown {
+  if (typeof item === "string") {
+    try { return JSON.parse(item); } catch { /* not JSON string */ }
+  }
+  return item;
+}
+
 function sanitizeUserContext(raw: string): string {
   return raw.slice(0, MAX_USER_CONTEXT).replace(/[{}\[\]]/g, "");
 }
@@ -163,7 +171,7 @@ async function evaluateBatch(
     let failCount = 0;
     const sampleErrors: string[] = [];
     for (const item of raw) {
-      const result = EvalItemSchema.safeParse(item);
+      const result = EvalItemSchema.safeParse(unwrapItem(item));
       if (result.success) {
         parsed.push(result.data);
       } else {
@@ -321,7 +329,7 @@ ${JSON.stringify(input)}
 
     const parsed: DeepDiveItem[] = [];
     for (const item of raw) {
-      const result = DeepDiveItemSchema.safeParse(item);
+      const result = DeepDiveItemSchema.safeParse(unwrapItem(item));
       if (result.success) parsed.push(result.data);
     }
 
@@ -411,7 +419,7 @@ ${JSON.stringify(input)}
 
     const parsed: { id: string; relativeRank: number }[] = [];
     for (const item of raw) {
-      const result = PairwiseItemSchema.safeParse(item);
+      const result = PairwiseItemSchema.safeParse(unwrapItem(item));
       if (result.success) parsed.push(result.data);
     }
 
@@ -481,13 +489,20 @@ ${JSON.stringify(input)}`;
     if (!Array.isArray(raw)) throw new Error("トレース計画の応答にitems配列がありません");
 
     const plans: MvpPlan[] = [];
+    let planFailCount = 0;
     for (const item of raw) {
-      const result = MvpPlanSchema.safeParse(item);
+      const result = MvpPlanSchema.safeParse(unwrapItem(item));
       if (result.success) {
         plans.push(result.data);
       } else {
-        errors.push(`トレース計画バリデーション失敗: ${JSON.stringify(result.error.issues?.slice(0, 2))}`);
+        planFailCount++;
+        if (planFailCount <= 2) {
+          errors.push(`トレース計画バリデーション失敗: ${JSON.stringify(result.error.issues?.slice(0, 2))}`);
+        }
       }
+    }
+    if (planFailCount > 2) {
+      errors.push(`他${planFailCount - 2}件のトレース計画もバリデーション失敗`);
     }
     return { plans, errors };
   } catch (e) {

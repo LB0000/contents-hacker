@@ -368,7 +368,7 @@ export default function Home() {
                 </button>
               ))}
               <span className="text-border-default">|</span>
-              {(["all", "hackernews", "producthunt", "github", "reddit"] as const).map((v) => (
+              {(["all", "hackernews", "producthunt", "github", "reddit", "indiehackers", "betalist"] as const).map((v) => (
                 <button
                   key={v}
                   onClick={() => setSourceFilter(v)}

@@ -2,6 +2,18 @@ import { NormalizedItem } from "../types";
 
 const BL_URL = "https://betalist.com/";
 const USER_AGENT = "Mozilla/5.0 (compatible; ContentsHacker/1.0)";
+const FETCH_TIMEOUT = 10_000;
+
+/** HTMLエンティティをデコード */
+function decodeEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'");
+}
 
 /** "Today", "Yesterday", "February 19th" 等をISO日時に変換 */
 function parseBetaListDate(text: string): string {
@@ -13,10 +25,16 @@ function parseBetaListDate(text: string): string {
     return new Date(now.getTime() - 86_400_000).toISOString();
   }
 
-  // "February 19th" 等のパターン
-  const cleaned = text.replace(/(st|nd|rd|th)/g, "").trim();
+  // "February 19th" → "February 19" （数字の直後の序数接尾辞のみ除去）
+  const cleaned = text.replace(/(\d+)(st|nd|rd|th)\b/g, "$1").trim();
   const parsed = new Date(`${cleaned} ${now.getFullYear()}`);
-  if (!isNaN(parsed.getTime())) return parsed.toISOString();
+  if (!isNaN(parsed.getTime())) {
+    // 未来日付なら前年と判定（年末年始の境界対策）
+    if (parsed.getTime() > now.getTime() + 86_400_000) {
+      return new Date(`${cleaned} ${now.getFullYear() - 1}`).toISOString();
+    }
+    return parsed.toISOString();
+  }
 
   return now.toISOString();
 }
@@ -41,13 +59,15 @@ function parseHTML(html: string): BLStartup[] {
     // /startups/slug/visit 等のサブパスは除外
     if (match[0].includes(`/startups/${slug}/`)) continue;
 
-    // imgタグやSVGを除外して残りのテキストを取得
-    const textOnly = inner
-      .replace(/<img[^>]*>/g, "")
-      .replace(/<svg[\s\S]*?<\/svg>/g, "")
-      .replace(/<[^>]*>/g, "\n")
-      .replace(/\s+/g, " ")
-      .trim();
+    // imgタグやSVGを除外して残りのテキストを取得し、エンティティをデコード
+    const textOnly = decodeEntities(
+      inner
+        .replace(/<img[^>]*>/g, "")
+        .replace(/<svg[\s\S]*?<\/svg>/g, "")
+        .replace(/<[^>]*>/g, "\n")
+        .replace(/\s+/g, " ")
+        .trim()
+    );
 
     if (!textOnly || textOnly.length < 3) continue;
 
@@ -71,32 +91,40 @@ function parseHTML(html: string): BLStartup[] {
 }
 
 export async function fetchBetaList(limit: number): Promise<NormalizedItem[]> {
-  const res = await fetch(BL_URL, {
-    headers: { "User-Agent": USER_AGENT },
-  });
-  if (!res.ok) throw new Error(`BetaList failed: ${res.status}`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
 
-  const html = await res.text();
-  const startups = parseHTML(html);
+  try {
+    const res = await fetch(BL_URL, {
+      signal: controller.signal,
+      headers: { "User-Agent": USER_AGENT },
+    });
+    if (!res.ok) throw new Error(`BetaList failed: ${res.status}`);
 
-  if (startups.length === 0) {
-    throw new Error("BetaList: HTML構造が変更された可能性があります（0件抽出）");
+    const html = await res.text();
+    const startups = parseHTML(html);
+
+    if (startups.length === 0) {
+      throw new Error("BetaList: HTML構造が変更された可能性があります（0件抽出）");
+    }
+
+    const twoWeeksAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
+
+    return startups
+      .filter((s) => new Date(s.date).getTime() >= twoWeeksAgo)
+      .slice(0, limit)
+      .map((s) => ({
+        id: `bl-${s.slug}`,
+        source: "betalist" as const,
+        title_en: s.name,
+        desc_en: s.description.slice(0, 400),
+        url: `https://betalist.com/startups/${s.slug}`,
+        tags: [],
+        publishedAt: s.date,
+        sourceScore: null,
+        marketCategory: "other",
+      }));
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const twoWeeksAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
-
-  return startups
-    .filter((s) => new Date(s.date).getTime() >= twoWeeksAgo)
-    .slice(0, limit)
-    .map((s) => ({
-      id: `bl-${s.slug}`,
-      source: "betalist" as const,
-      title_en: s.name,
-      desc_en: s.description.slice(0, 400),
-      url: `https://betalist.com/startups/${s.slug}`,
-      tags: [],
-      publishedAt: s.date,
-      sourceScore: null,
-      marketCategory: "other" as const,
-    }));
 }
