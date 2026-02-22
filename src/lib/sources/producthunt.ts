@@ -1,28 +1,47 @@
 import { NormalizedItem } from "../types";
 
-const PH_RSS_URL = "https://www.producthunt.com/feed";
+const PH_FEED_URL = "https://www.producthunt.com/feed";
 
-/** RSS XMLから簡易パースでアイテムを抽出 */
-function parseRssItems(xml: string): Array<{
+/** Atom/RSS XMLから簡易パースでアイテムを抽出 */
+function parseFeedItems(xml: string): Array<{
   title: string;
   link: string;
   description: string;
   pubDate: string;
 }> {
   const items: Array<{ title: string; link: string; description: string; pubDate: string }> = [];
-  const itemRegex = /<item>([\s\S]*?)<\/item>/g;
-  let match;
 
-  while ((match = itemRegex.exec(xml)) !== null) {
-    const block = match[1];
-    const title = block.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/)?.[1]
-      ?? block.match(/<title>(.*?)<\/title>/)?.[1]
+  // Atom形式: <entry>...</entry>
+  const entryRegex = /<entry>([\s\S]*?)<\/entry>/g;
+  // RSS形式: <item>...</item>
+  const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+
+  const blocks: string[] = [];
+  let match;
+  while ((match = entryRegex.exec(xml)) !== null) blocks.push(match[1]);
+  while ((match = itemRegex.exec(xml)) !== null) blocks.push(match[1]);
+
+  for (const block of blocks) {
+    const title = block.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/)?.[1]
+      ?? block.match(/<title>([\s\S]*?)<\/title>/)?.[1]
       ?? "";
-    const link = block.match(/<link>(.*?)<\/link>/)?.[1] ?? "";
-    const description = block.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>/)?.[1]
-      ?? block.match(/<description>(.*?)<\/description>/)?.[1]
+
+    // Atom: <link rel="alternate" href="URL"/>  RSS: <link>URL</link>
+    const link = block.match(/<link[^>]+rel="alternate"[^>]+href="([^"]+)"/)?.[1]
+      ?? block.match(/<link[^>]+href="([^"]+)"[^>]*rel="alternate"/)?.[1]
+      ?? block.match(/<link>([\s\S]*?)<\/link>/)?.[1]
       ?? "";
-    const pubDate = block.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] ?? "";
+
+    // Atom: <content>  RSS: <description>
+    const description = block.match(/<content[^>]*>([\s\S]*?)<\/content>/)?.[1]
+      ?? block.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/)?.[1]
+      ?? block.match(/<description>([\s\S]*?)<\/description>/)?.[1]
+      ?? "";
+
+    // Atom: <published>  RSS: <pubDate>
+    const pubDate = block.match(/<published>([\s\S]*?)<\/published>/)?.[1]
+      ?? block.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1]
+      ?? "";
 
     if (title && link) {
       items.push({ title, link, description, pubDate });
@@ -33,29 +52,29 @@ function parseRssItems(xml: string): Array<{
 }
 
 export async function fetchProductHunt(limit: number): Promise<NormalizedItem[]> {
-  const res = await fetch(PH_RSS_URL);
-  if (!res.ok) throw new Error(`Product Hunt RSS failed: ${res.status}`);
+  const res = await fetch(PH_FEED_URL);
+  if (!res.ok) throw new Error(`Product Hunt feed failed: ${res.status}`);
 
   const xml = await res.text();
-  const rssItems = parseRssItems(xml);
+  const feedItems = parseFeedItems(xml);
 
-  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const fourteenDaysAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
 
-  return rssItems
-    .slice(0, limit)
+  return feedItems
     .filter((item) => {
-      if (!item.pubDate) return true;
+      if (!item.pubDate) return false;
       const published = new Date(item.pubDate).getTime();
-      return !isNaN(published) && published >= sevenDaysAgo;
+      return !isNaN(published) && published >= fourteenDaysAgo;
     })
+    .slice(0, limit)
     .map((item, i) => ({
-    id: `ph-${item.link.split("/").pop() || String(i)}`,
-    source: "producthunt" as const,
-    title_en: item.title,
-    desc_en: item.description.replace(/<[^>]*>/g, "").slice(0, 200),
-    url: item.link,
-    tags: [],
-    publishedAt: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
-    sourceScore: null,
-  }));
+      id: `ph-${item.link.replace(/\/+$/, "").split("/").pop() || String(i)}`,
+      source: "producthunt" as const,
+      title_en: item.title,
+      desc_en: item.description.replace(/<[^>]*>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim().slice(0, 400),
+      url: item.link,
+      tags: [],
+      publishedAt: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
+      sourceScore: null,
+    }));
 }

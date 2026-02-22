@@ -1,11 +1,11 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { NormalizedItem, MvpPlan } from "@/lib/types";
 import { fetchHackerNews } from "@/lib/sources/hackernews";
 import { fetchProductHunt } from "@/lib/sources/producthunt";
 import { fetchGitHub } from "@/lib/sources/github";
 import { fetchReddit } from "@/lib/sources/reddit";
 import { deduplicateAndTrim, needsMoreItems } from "@/lib/normalize";
-import { evaluateAll, generateMvpPlans } from "@/lib/llm/anthropic";
+import { evaluateAll, generateMvpPlans, deepDiveEval } from "@/lib/llm/openai";
 import { pickTop3 } from "@/lib/scoring";
 import { cached, isCached } from "@/lib/sources/cache";
 
@@ -36,13 +36,24 @@ export async function POST(request: Request) {
       };
 
       try {
+        // 0. リクエストボディからユーザーコンテキストを取得
+        let userContext: string | undefined;
+        try {
+          const body = await request.json();
+          if (body?.userContext && typeof body.userContext === "string" && body.userContext.trim()) {
+            userContext = body.userContext.trim();
+          }
+        } catch {
+          // body が空でも問題なし
+        }
+
         // 1. 環境変数チェック
-        const anthropicKey = process.env.ANTHROPIC_API_KEY;
-        if (!anthropicKey) {
-          send("error", "ANTHROPIC_API_KEY が未設定です。.env.local に設定してください。");
+        const openaiKey = process.env.OPENAI_API_KEY;
+        if (!openaiKey) {
+          send("error", "OPENAI_API_KEY が未設定です。.env.local に設定してください。");
           return;
         }
-        const client = new Anthropic({ apiKey: anthropicKey });
+        const client = new OpenAI({ apiKey: openaiKey });
         const errors: string[] = [];
 
         // 2. ソース取得
@@ -97,18 +108,42 @@ export async function POST(request: Request) {
         if (signal.aborted) return;
         send("fetch_done", `${trimmed.length}件に圧縮完了`);
 
-        // 3. Claude 評価
-        send("eval", `Claude で評価中 (${trimmed.length}件)...`);
+        // 3. LLM 評価
+        send("eval", `LLM で評価中 (${trimmed.length}件)...`);
 
-        const { candidates, errors: evalErrors } = await evaluateAll(client, trimmed);
+        const { candidates: evalCandidates, errors: evalErrors } = await evaluateAll(client, trimmed, userContext, signal);
         errors.push(...evalErrors);
 
         if (signal.aborted) return;
 
-        candidates.sort((a, b) => b.totalScore - a.totalScore);
+        let candidates = evalCandidates;
         const passCount = candidates.filter((c) => c.gate.pass).length;
 
         send("eval_done", `評価完了 — PASS: ${passCount}件 / FAIL: ${candidates.length - passCount}件`);
+
+        // 3.5 確信度の低い候補を深掘り
+        if (!signal.aborted) {
+          const lowConfCount = candidates.filter(
+            (c) => c.gate.pass && c.scores &&
+            (c.scores.jpDemand.confidence === "low" || c.scores.jpGap.confidence === "low")
+          ).length;
+
+          if (lowConfCount > 0) {
+            send("deepdive", `確信度の低い候補を深掘り中 (${lowConfCount}件)...`);
+            const { updated, errors: ddErrors } = await deepDiveEval(client, candidates, userContext, signal);
+            candidates = updated;
+            errors.push(...ddErrors);
+            if (!signal.aborted) {
+              send("deepdive_done", `深掘り完了 (${lowConfCount}件)`);
+            }
+          } else {
+            send("deepdive_done", "深掘り対象なし（スキップ）");
+          }
+        }
+
+        if (signal.aborted) return;
+
+        candidates.sort((a, b) => b.totalScore - a.totalScore);
 
         // 4. トレース計画
         const top3 = pickTop3(candidates);
@@ -116,7 +151,7 @@ export async function POST(request: Request) {
 
         if (top3.length > 0 && !signal.aborted) {
           send("plan", "上位3件のトレース計画を生成中...");
-          const { plans, errors: planErrors } = await generateMvpPlans(client, top3);
+          const { plans, errors: planErrors } = await generateMvpPlans(client, top3, signal);
           topPlans = plans;
           errors.push(...planErrors);
         }

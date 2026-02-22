@@ -11,14 +11,17 @@ export const EvalItemSchema = z.object({
   }),
   scores: z
     .object({
-      traceSpeed: z.object({ score: z.number().min(0).max(5), reason_ja: z.string() }),
-      jpDemand: z.object({ score: z.number().min(0).max(5), reason_ja: z.string() }),
-      jpGap: z.object({ score: z.number().min(0).max(5), reason_ja: z.string() }),
-      riskLow: z.object({ score: z.number().min(0).max(5), reason_ja: z.string() }),
+      traceSpeed: z.object({ score: z.number().min(0).max(5), reason_ja: z.string(), confidence: z.enum(["high", "medium", "low"]).default("medium") }),
+      jpDemand: z.object({ score: z.number().min(0).max(5), reason_ja: z.string(), confidence: z.enum(["high", "medium", "low"]).default("medium") }),
+      jpGap: z.object({ score: z.number().min(0).max(5), reason_ja: z.string(), confidence: z.enum(["high", "medium", "low"]).default("medium") }),
+      riskLow: z.object({ score: z.number().min(0).max(5), reason_ja: z.string(), confidence: z.enum(["high", "medium", "low"]).default("medium") }),
     })
     .nullable(),
-  jpCompetitors: z.array(z.string()),
-});
+  jpCompetitors: z.array(z.string()).optional().default([]),
+}).refine(
+  (data) => !data.gate.pass || data.scores !== null,
+  { message: "scores must not be null when gate.pass is true" }
+);
 
 /** LLM 2回目: トレース計画 の1件分 */
 export const MvpPlanSchema = z.object({

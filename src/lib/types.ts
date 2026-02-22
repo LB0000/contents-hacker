@@ -22,6 +22,7 @@ export interface GateResult {
 export interface ScoreEntry {
   score: number; // 0-5
   reason_ja: string;
+  confidence: "high" | "medium" | "low";
 }
 
 /** 4軸採点（日本トレース特化） */
@@ -48,6 +49,7 @@ export interface Candidate {
   scores: Scores | null; // gate.pass = false なら null
   totalScore: number;
   jpCompetitors: string[]; // 日本の既知競合サービス名
+  deepDived: boolean; // トリアージ深掘り済みか
 }
 
 /** 上位3件のトレース計画 */

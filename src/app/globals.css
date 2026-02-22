@@ -1,1 +1,95 @@
 @import "tailwindcss";
+
+/* ---------- Tailwind v4 Theme Extension ---------- */
+@theme {
+  --color-primary: #1E40AF;
+  --color-primary-light: #3B82F6;
+  --color-primary-glow: rgba(59, 130, 246, 0.3);
+  --color-cta: #F59E0B;
+  --color-cta-hover: #D97706;
+
+  --color-surface-base: #030712;
+  --color-surface-raised: #0A0F1C;
+  --color-surface-overlay: #111827;
+  --color-surface-hover: #1F2937;
+
+  --color-text-primary: #E5E7EB;
+  --color-text-secondary: #9CA3AF;
+  --color-text-muted: #6B7280;
+
+  --color-border-default: #1F2937;
+  --color-border-hover: #374151;
+
+  --color-score-high: #22C55E;
+  --color-score-mid: #EAB308;
+  --color-score-low: #EF4444;
+
+  --color-tier1-accent: #3B82F6;
+  --color-tier1-bg: rgba(30, 64, 175, 0.08);
+
+  --color-gate-pass: #22C55E;
+  --color-gate-fail: #6B7280;
+
+  --font-heading: 'Fira Code', ui-monospace, monospace;
+  --font-body: 'Fira Sans', ui-sans-serif, sans-serif;
+  --font-mono: 'Fira Code', ui-monospace, monospace;
+
+  --shadow-glow-sm: 0 0 6px var(--color-primary-glow);
+  --shadow-glow-md: 0 0 10px var(--color-primary-glow);
+  --shadow-glow-lg: 0 0 20px var(--color-primary-glow);
+
+  --transition-fast: 150ms ease;
+  --transition-default: 200ms ease;
+  --transition-slow: 300ms ease;
+}
+
+/* ---------- Base Styles ---------- */
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-surface-base);
+  color: var(--color-text-primary);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+}
+
+/* ---------- Utility Classes ---------- */
+.text-glow {
+  text-shadow: var(--shadow-glow-md);
+}
+
+.text-glow-sm {
+  text-shadow: var(--shadow-glow-sm);
+}
+
+.btn-cta:hover {
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+}
+
+/* ---------- Animations ---------- */
+.expand-enter {
+  animation: expandIn var(--transition-slow) ease forwards;
+}
+
+@keyframes expandIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.score-bar-fill {
+  transition: width var(--transition-default);
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-slide-up {
+  animation: fadeSlideUp 300ms ease forwards;
+  opacity: 0;
+}
+
+.animate-delay-100 { animation-delay: 100ms; }
+.animate-delay-200 { animation-delay: 200ms; }

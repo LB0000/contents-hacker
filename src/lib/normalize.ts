@@ -18,7 +18,17 @@ export function deduplicateAndTrim(items: NormalizedItem[]): NormalizedItem[] {
   const byUrl = new Map<string, NormalizedItem>();
 
   for (const item of items) {
-    const key = item.url.replace(/\/$/, "").toLowerCase();
+    let key: string;
+    try {
+      const u = new URL(item.url);
+      u.hash = "";
+      u.searchParams.delete("utm_source");
+      u.searchParams.delete("utm_medium");
+      u.searchParams.delete("utm_campaign");
+      key = u.origin + u.pathname.replace(/\/$/, "") + u.search;
+    } catch {
+      key = item.url.replace(/\/$/, "").toLowerCase();
+    }
     const existing = byUrl.get(key);
 
     if (!existing) {
@@ -40,8 +50,27 @@ export function deduplicateAndTrim(items: NormalizedItem[]): NormalizedItem[] {
 
   const deduped = [...byUrl.values()];
 
-  // rankScore でソート（sourceScore がある方を優先、なければ 0）
-  deduped.sort((a, b) => (b.sourceScore ?? 0) - (a.sourceScore ?? 0));
+  // ソース別に正規化スコア（0-1）を算出してからソート
+  // sourceScore のスケールが異なる（GH星数 vs HN/RD投票数 vs PH null）ため
+  const bySource = new Map<string, NormalizedItem[]>();
+  for (const item of deduped) {
+    const list = bySource.get(item.source) ?? [];
+    list.push(item);
+    bySource.set(item.source, list);
+  }
+
+  const normalizedScore = new Map<string, number>();
+  for (const [, items] of bySource) {
+    const scores = items.map((it) => it.sourceScore ?? 0);
+    const max = Math.max(...scores);
+    const min = Math.min(...scores);
+    const range = max - min || 1;
+    for (const it of items) {
+      normalizedScore.set(it.id, (it.sourceScore ?? 0 - min) / range);
+    }
+  }
+
+  deduped.sort((a, b) => (normalizedScore.get(b.id) ?? 0) - (normalizedScore.get(a.id) ?? 0));
 
   return deduped.slice(0, TARGET);
 }

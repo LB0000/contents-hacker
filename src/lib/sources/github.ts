@@ -13,37 +13,42 @@ interface GHRepo {
 }
 
 export async function fetchGitHub(limit: number): Promise<NormalizedItem[]> {
-  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-  const perPage = Math.min(limit, 30); // GitHub API max per_page is 100, but keep small for rate limit
+  const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const perPage = Math.min(limit, 30);
 
+  const q = encodeURIComponent(`created:>${twoWeeksAgo} stars:>10`);
   const res = await fetch(
-    `${GITHUB_API}?q=created:>${weekAgo}+topic:saas+topic:webapp+topic:tool&sort=stars&order=desc&per_page=${perPage}`,
-    { headers: { Accept: "application/vnd.github.v3+json" } }
+    `${GITHUB_API}?q=${q}&sort=stars&order=desc&per_page=${perPage}`,
+    { headers: {
+      Accept: "application/vnd.github.v3+json",
+      ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}),
+    } }
   );
 
-  if (!res.ok) throw new Error(`GitHub API failed: ${res.status}`);
+  if (!res.ok) {
+    const statusHint = res.status === 403 ? " (rate limit — try again in a few minutes)" : "";
+    throw new Error(`GitHub API failed: ${res.status}${statusHint}`);
+  }
 
   const json = await res.json();
   const repos: GHRepo[] = json?.items ?? [];
 
-  const MIN_STARS = 5;
-  const NOISE_KEYWORDS = ["clone", "tutorial", "template"];
+  const NOISE_KEYWORDS = ["clone", "tutorial", "template", "awesome-list", "interview"];
 
   return repos
     .filter((repo) => {
-      if (repo.stargazers_count < MIN_STARS) return false;
       const desc = (repo.description ?? "").toLowerCase();
       if (NOISE_KEYWORDS.some((kw) => desc.includes(kw))) return false;
       return true;
     })
     .map((repo) => ({
-    id: `gh-${repo.id}`,
-    source: "github" as const,
-    title_en: repo.full_name,
-    desc_en: repo.description?.slice(0, 200) ?? "",
-    url: repo.html_url,
-    tags: repo.topics?.slice(0, 8) ?? [],
-    publishedAt: repo.created_at,
-    sourceScore: repo.stargazers_count,
-  }));
+      id: `gh-${repo.id}`,
+      source: "github" as const,
+      title_en: repo.full_name,
+      desc_en: repo.description?.slice(0, 400) ?? "",
+      url: repo.html_url,
+      tags: repo.topics?.slice(0, 8) ?? [],
+      publishedAt: repo.created_at,
+      sourceScore: repo.stargazers_count,
+    }));
 }
