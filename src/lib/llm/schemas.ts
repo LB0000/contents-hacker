@@ -7,7 +7,7 @@ export const EvalItemSchema = z.object({
   title_ja: z.string(),
   desc_ja: z.string(),
   gate: z.object({
-    pass: z.boolean(),
+    result: z.enum(["pass", "maybe", "fail"]),
     reason_ja: z.string(),
   }),
   scores: z
@@ -21,8 +21,8 @@ export const EvalItemSchema = z.object({
   jpCompetitors: z.array(z.string()).optional().default([]),
   marketCategory: z.enum(MARKET_CATEGORIES).catch("other").optional().default("other"),
 }).refine(
-  (data) => !data.gate.pass || data.scores !== null,
-  { message: "scores must not be null when gate.pass is true" }
+  (data) => data.gate.result === "fail" || data.scores !== null,
+  { message: "scores must not be null when gate.result is pass or maybe" }
 );
 
 /** LLM 2回目: トレース計画 の1件分 */
@@ -39,5 +39,13 @@ export const MvpPlanSchema = z.object({
 
 export const MvpPlansResponseSchema = z.array(MvpPlanSchema);
 
+/** ペアワイズ比較: 1件分 */
+export const PairwiseItemSchema = z.object({
+  id: z.string(),
+  relativeRank: z.number().min(1),
+  reasoning: z.string(),
+});
+
 export type EvalItem = z.infer<typeof EvalItemSchema>;
 export type MvpPlanItem = z.infer<typeof MvpPlanSchema>;
+export type PairwiseItem = z.infer<typeof PairwiseItemSchema>;

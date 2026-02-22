@@ -1,10 +1,19 @@
-import type { Candidate, MvpPlan, RunResult } from "./types";
+import type { Candidate, GateResult, MvpPlan, RunResult } from "./types";
+import type { MarketCategory } from "./categories";
 import { HISTORY_KEY, MAX_HISTORY } from "./constants";
 
 export interface RunHistory {
   timestamp: string;
   candidates: Candidate[];
   topPlans: MvpPlan[];
+}
+
+/** 旧format(gate.pass: boolean)を新format(gate.result)に変換 */
+function migrateGate(gate: unknown): GateResult {
+  if (typeof gate !== "object" || gate === null) return { result: "fail", reason_ja: "" };
+  const g = gate as Record<string, unknown>;
+  if (typeof g.result === "string") return gate as GateResult;
+  return { result: g.pass ? "pass" as const : "fail" as const, reason_ja: String(g.reason_ja ?? "") };
 }
 
 export function loadHistory(): RunHistory[] {
@@ -25,9 +34,10 @@ export function loadHistory(): RunHistory[] {
       .map((h) => ({
         ...h,
         topPlans: Array.isArray(h.topPlans) ? h.topPlans : [],
-        candidates: h.candidates.map((c) => ({
+        candidates: h.candidates.map((c: Candidate) => ({
           ...c,
-          marketCategory: c.marketCategory ?? ("other" as const),
+          marketCategory: (c.marketCategory ?? "other") as MarketCategory,
+          gate: migrateGate(c.gate),
         })),
       }));
   } catch {

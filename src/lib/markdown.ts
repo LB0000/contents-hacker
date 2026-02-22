@@ -30,9 +30,9 @@ export function resultToMarkdown(result: RunResult): string {
   }
 
   const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\n/g, " ");
-  const passed = result.candidates.filter((c) => c.gate.pass);
+  const passed = result.candidates.filter((c) => c.gate.result !== "fail");
   if (passed.length > 0) {
-    lines.push("## PASS 候補一覧", "");
+    lines.push("## PASS / MAYBE 候補一覧", "");
     lines.push("| # | Src | Cat | Title | 速度 | 需要 | 空白 | Risk | Total |");
     lines.push("|---|-----|-----|-------|------|------|------|------|-------|");
     passed

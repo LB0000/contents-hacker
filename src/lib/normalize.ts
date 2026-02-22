@@ -5,11 +5,95 @@ const TARGET = 30;
 const MIN_PER_CATEGORY = 2;
 const MAX_AI_TOOL = 10;
 
-// ソース優先順位: HN > GH > PH > RD (スコア情報が豊富な順)
+// ---------- OGP 自動補完 ----------
+
+const OGP_TIMEOUT = 3_000;
+const MAX_DESC_LENGTH = 400;
+const MIN_DESC_LENGTH = 100;
+
+/** Block private/loopback IPs to prevent SSRF */
+function isSafeUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+    const host = u.hostname;
+    if (host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "0.0.0.0") return false;
+    // Block private IP ranges: 10.x, 172.16-31.x, 192.168.x, 169.254.x
+    if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.)/.test(host)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Extract OGP or meta description, handling both attribute orderings */
+function extractDescription(html: string): string | null {
+  // og:description — handles both property...content and content...property orders
+  const ogDesc =
+    html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i)?.[1] ??
+    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:description["']/i)?.[1];
+  if (ogDesc) return ogDesc;
+
+  // meta name=description — handles both orderings
+  const metaDesc =
+    html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i)?.[1] ??
+    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i)?.[1];
+  return metaDesc ?? null;
+}
+
+async function fetchOgp(url: string): Promise<string | null> {
+  if (!isSafeUrl(url)) return null;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), OGP_TIMEOUT);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; ContentsHacker/1.0)" },
+      redirect: "follow",
+    });
+    if (!res.ok) return null;
+    // Only read first 32KB to avoid downloading huge pages
+    const reader = res.body?.getReader();
+    if (!reader) return null;
+    const chunks: Uint8Array[] = [];
+    let totalLength = 0;
+    const MAX_BYTES = 32_768;
+    while (totalLength < MAX_BYTES) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      totalLength += value.length;
+    }
+    reader.cancel().catch(() => {});
+    const html = new TextDecoder().decode(Buffer.concat(chunks)).slice(0, MAX_BYTES);
+    return extractDescription(html);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function supplementDescriptions(items: NormalizedItem[]): Promise<NormalizedItem[]> {
+  const promises = items.map(async (item) => {
+    if (item.desc_en.length >= MIN_DESC_LENGTH) return item;
+    const desc = await fetchOgp(item.url);
+    if (!desc) return item;
+    const combined = `${item.desc_en} ${desc}`.trim().slice(0, MAX_DESC_LENGTH);
+    return { ...item, desc_en: combined };
+  });
+
+  const results = await Promise.allSettled(promises);
+  return results.map((r, i) => (r.status === "fulfilled" ? r.value : items[i]));
+}
+
+// ソース優先順位: HN > GH > PH=IH > BL=RD (スコア情報が豊富な順)
 const SOURCE_PRIORITY: Record<string, number> = {
   hackernews: 4,
   github: 3,
   producthunt: 2,
+  indiehackers: 2,
+  betalist: 1,
   reddit: 1,
 };
 
@@ -17,7 +101,7 @@ const SOURCE_PRIORITY: Record<string, number> = {
  * URL重複排除して多様性を考慮しつつ rankScore 降順で30件に固定する。
  * 優先順位の高いソースを残し、低い方のtagsをマージする。
  */
-export function deduplicateAndTrim(items: NormalizedItem[]): NormalizedItem[] {
+export async function deduplicateAndTrim(items: NormalizedItem[]): Promise<NormalizedItem[]> {
   const byUrl = new Map<string, NormalizedItem>();
 
   for (const item of items) {
@@ -74,13 +158,21 @@ export function deduplicateAndTrim(items: NormalizedItem[]): NormalizedItem[] {
     }
   }
 
-  // キーワードヒューリスティックで市場カテゴリを付与
+  // 海外注目度: 正規化済みスコアをアイテムに設定
   for (const item of deduped) {
+    (item as NormalizedItem).overseasPopularity = normalizedScore.get(item.id) ?? 0;
+  }
+
+  // OGP自動補完: desc_enが短い候補をURL先から補強
+  const supplemented = await supplementDescriptions(deduped);
+
+  // キーワードヒューリスティックで市場カテゴリを付与
+  for (const item of supplemented) {
     item.marketCategory = classifyByKeywords(item);
   }
 
   // 多様性を考慮した30件選定
-  return diverseSelect(deduped, normalizedScore);
+  return diverseSelect(supplemented, normalizedScore);
 }
 
 /**

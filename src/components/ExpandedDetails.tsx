@@ -7,8 +7,8 @@ export function ExpandedDetails({ candidate: c }: { candidate: Candidate }) {
     <div className="text-xs text-text-secondary space-y-1.5 expand-enter">
       <div>
         <span className="text-text-muted font-medium">Gate:</span>{" "}
-        <span className={c.gate.pass ? "text-gate-pass" : "text-score-low"}>
-          {c.gate.pass ? "PASS" : "FAIL"}
+        <span className={c.gate.result === "pass" ? "text-gate-pass" : c.gate.result === "maybe" ? "text-yellow-400" : "text-score-low"}>
+          {c.gate.result.toUpperCase()}
         </span>{" "}
         — {c.gate.reason_ja}
       </div>

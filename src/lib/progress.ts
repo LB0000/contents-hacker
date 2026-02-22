@@ -9,6 +9,7 @@ export const INITIAL_STEPS: ProgressStep[] = [
   { key: "fetch", label: "取得", status: "pending" },
   { key: "normalize", label: "圧縮", status: "pending" },
   { key: "eval", label: "AI評価", status: "pending" },
+  { key: "pairwise", label: "比較", status: "pending" },
   { key: "deepdive", label: "深掘り", status: "pending" },
   { key: "plan", label: "計画生成", status: "pending" },
 ];
@@ -22,9 +23,11 @@ export function deriveSteps(stepKey: string, message: string): ProgressStep[] {
     fetch_done:          { doneUpTo: 1 },
     eval:                { doneUpTo: 1, activeIdx: 2 },
     eval_done:           { doneUpTo: 2 },
-    deepdive:            { doneUpTo: 2, activeIdx: 3 },
-    deepdive_done:       { doneUpTo: 3 },
-    plan:                { doneUpTo: 3, activeIdx: 4 },
+    pairwise:            { doneUpTo: 2, activeIdx: 3 },
+    pairwise_done:       { doneUpTo: 3 },
+    deepdive:            { doneUpTo: 3, activeIdx: 4 },
+    deepdive_done:       { doneUpTo: 4 },
+    plan:                { doneUpTo: 4, activeIdx: 5 },
   };
 
   const t = transitions[stepKey];

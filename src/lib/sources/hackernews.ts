@@ -52,15 +52,18 @@ export async function fetchHackerNews(limit: number): Promise<NormalizedItem[]> 
       if (!it.url) return false; // opinion/self-post without external URL
       return true;
     })
-    .map((it) => ({
-      id: `hn-${it.id}`,
-      source: "hackernews" as const,
-      title_en: it.title!,
-      desc_en: it.text?.slice(0, 200) ?? "",
-      url: it.url ?? `https://news.ycombinator.com/item?id=${it.id}`,
-      tags: [],
-      publishedAt: it.time ? new Date(it.time * 1000).toISOString() : new Date().toISOString(),
-      sourceScore: it.score ?? null,
-      marketCategory: "other",
-    }));
+    .map((it) => {
+      const isShowHN = it.title!.startsWith("Show HN:");
+      return {
+        id: `hn-${it.id}`,
+        source: "hackernews" as const,
+        title_en: it.title!,
+        desc_en: it.text?.slice(0, 200) ?? "",
+        url: it.url ?? `https://news.ycombinator.com/item?id=${it.id}`,
+        tags: isShowHN ? ["show-hn"] : [],
+        publishedAt: it.time ? new Date(it.time * 1000).toISOString() : new Date().toISOString(),
+        sourceScore: (it.score ?? 0) + (isShowHN ? 20 : 0),
+        marketCategory: "other",
+      };
+    });
 }

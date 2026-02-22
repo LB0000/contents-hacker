@@ -4,8 +4,10 @@ import { fetchHackerNews } from "@/lib/sources/hackernews";
 import { fetchProductHunt } from "@/lib/sources/producthunt";
 import { fetchGitHub } from "@/lib/sources/github";
 import { fetchReddit } from "@/lib/sources/reddit";
+import { fetchIndiehackers } from "@/lib/sources/indiehackers";
+import { fetchBetaList } from "@/lib/sources/betalist";
 import { deduplicateAndTrim, needsMoreItems } from "@/lib/normalize";
-import { evaluateAll, generateMvpPlans, deepDiveEval } from "@/lib/llm/openai";
+import { evaluateAll, generateMvpPlans, deepDiveEval, pairwiseCompare } from "@/lib/llm/openai";
 import { pickTop3 } from "@/lib/scoring";
 import { cached, isCached } from "@/lib/sources/cache";
 
@@ -18,6 +20,8 @@ const SOURCES: { name: string; fetch: Fetcher }[] = [
   { name: "Product Hunt", fetch: fetchProductHunt },
   { name: "GitHub Trending", fetch: fetchGitHub },
   { name: "Reddit r/SaaS", fetch: fetchReddit },
+  { name: "Indie Hackers", fetch: fetchIndiehackers },
+  { name: "BetaList", fetch: fetchBetaList },
 ];
 
 function sseEvent(data: Record<string, unknown>): string {
@@ -61,7 +65,7 @@ export async function POST(request: Request) {
 
         // 2. ソース取得
         const allCached = SOURCES.every((s) => isCached(`${s.name}-60`));
-        send("fetch", allCached ? "4ソースから取得中... (キャッシュ)" : "4ソースから取得中...");
+        send("fetch", allCached ? `${SOURCES.length}ソースから取得中... (キャッシュ)` : `${SOURCES.length}ソースから取得中...`);
 
         let trimmed: NormalizedItem[] = [];
         for (const limit of [60, 120]) {
@@ -76,6 +80,7 @@ export async function POST(request: Request) {
           const SHORT_NAMES: Record<string, string> = {
             "Hacker News": "HN", "Product Hunt": "PH",
             "GitHub Trending": "GH", "Reddit r/SaaS": "RD",
+            "Indie Hackers": "IH", "BetaList": "BL",
           };
           const statusParts: string[] = [];
           results.forEach((r, i) => {
@@ -100,7 +105,7 @@ export async function POST(request: Request) {
             return;
           }
 
-          trimmed = deduplicateAndTrim(items);
+          trimmed = await deduplicateAndTrim(items);
 
           if (!needsMoreItems(trimmed.length)) {
             errors.push(...fetchErrors);
@@ -120,14 +125,30 @@ export async function POST(request: Request) {
         if (signal.aborted) return;
 
         let candidates = evalCandidates;
-        const passCount = candidates.filter((c) => c.gate.pass).length;
+        const passCount = candidates.filter((c) => c.gate.result === "pass").length;
+        const maybeCount = candidates.filter((c) => c.gate.result === "maybe").length;
+        const failCount = candidates.length - passCount - maybeCount;
 
-        send("eval_done", `評価完了 — PASS: ${passCount}件 / FAIL: ${candidates.length - passCount}件`);
+        send("eval_done", `評価完了 — PASS: ${passCount}件 / MAYBE: ${maybeCount}件 / FAIL: ${failCount}件`);
+
+        // 3.3 ペアワイズ相対比較
+        const nonFailCount = passCount + maybeCount;
+        if (!signal.aborted && nonFailCount >= 3) {
+          send("pairwise", `上位候補を相対比較中...`);
+          const { updated: pwUpdated, errors: pwErrors } = await pairwiseCompare(client, candidates, userContext, signal);
+          candidates = pwUpdated;
+          errors.push(...pwErrors);
+          if (!signal.aborted) {
+            send("pairwise_done", `相対比較完了`);
+          }
+        } else if (!signal.aborted) {
+          send("pairwise_done", "相対比較スキップ（PASS/MAYBE候補不足）");
+        }
 
         // 3.5 確信度の低い候補を深掘り
         if (!signal.aborted) {
           const lowConfCount = candidates.filter(
-            (c) => c.gate.pass && c.scores &&
+            (c) => c.gate.result !== "fail" && c.scores &&
             (c.scores.jpDemand.confidence === "low" || c.scores.jpGap.confidence === "low")
           ).length;
 

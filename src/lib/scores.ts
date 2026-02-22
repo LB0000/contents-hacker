@@ -47,6 +47,7 @@ export function calcWeightedTotal(c: Candidate, w: ScoreWeights): number {
 export function getScoreValue(c: Candidate, key: SortKey, weights: ScoreWeights): number {
   if (key === "totalScore") return calcWeightedTotal(c, weights);
   if (key === "sourceScore") return c.sourceScore ?? -1;
+  if (key === "overseasPopularity") return c.overseasPopularity ?? 0;
   if (!c.scores) return -1;
   return c.scores[key].score;
 }

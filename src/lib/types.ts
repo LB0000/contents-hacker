@@ -3,7 +3,7 @@ import type { MarketCategory } from "./categories";
 /** ソースから取得した生データを正規化した共通型 */
 export interface NormalizedItem {
   id: string;
-  source: "producthunt" | "hackernews" | "github" | "reddit";
+  source: "producthunt" | "hackernews" | "github" | "reddit" | "indiehackers" | "betalist";
   title_en: string;
   desc_en: string;
   url: string;
@@ -11,13 +11,15 @@ export interface NormalizedItem {
   publishedAt: string;
   sourceScore: number | null;
   marketCategory: MarketCategory;
+  overseasPopularity?: number; // 0-1 正規化済みソーススコア
 }
 
 export type SourceType = NormalizedItem["source"];
 
-/** 関門判定 */
+/** 関門判定（3段階） */
+export type GateLevel = "pass" | "maybe" | "fail";
 export interface GateResult {
-  pass: boolean;
+  result: GateLevel;
   reason_ja: string;
 }
 
@@ -49,11 +51,12 @@ export interface Candidate {
   publishedAt: string;
   sourceScore: number | null;
   gate: GateResult;
-  scores: Scores | null; // gate.pass = false なら null
+  scores: Scores | null; // gate.result = "fail" なら null
   totalScore: number;
   jpCompetitors: string[]; // 日本の既知競合サービス名
   deepDived: boolean; // トリアージ深掘り済みか
   marketCategory: MarketCategory;
+  overseasPopularity: number; // 0-1 海外注目度
 }
 
 /** 上位3件のトレース計画 */

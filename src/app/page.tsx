@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import type { RunResult, SourceType } from "@/lib/types";
+import type { RunResult, SourceType, Candidate } from "@/lib/types";
 import { MARKET_CATEGORIES, CATEGORY_BADGE, type MarketCategory } from "@/lib/categories";
 import { SOURCE_BADGE, WEIGHT_LABELS, WEIGHT_KEYS, WEIGHTS_KEY, type SortKey } from "@/lib/constants";
 import { type RunHistory, loadHistory, saveHistory, getPreviousIds } from "@/lib/history";
@@ -28,7 +28,7 @@ export default function Home() {
 
   const [sortKey, setSortKey] = useState<SortKey>("totalScore");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [gateFilter, setGateFilter] = useState<"all" | "pass" | "fail">("all");
+  const [gateFilter, setGateFilter] = useState<"all" | "pass" | "maybe" | "fail">("all");
   const [sourceFilter, setSourceFilter] = useState<SourceType | "all">("all");
   const [categoryFilter, setCategoryFilter] = useState<MarketCategory | "all">("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -36,6 +36,7 @@ export default function Home() {
   const [showWeights, setShowWeights] = useState(false);
   const [userContext, setUserContext] = useState("");
   const [showFailedTier, setShowFailedTier] = useState(false);
+  const [deepDiveLoadingId, setDeepDiveLoadingId] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -159,6 +160,36 @@ export default function Home() {
     localStorage.removeItem(WEIGHTS_KEY);
   }
 
+  const handleDeepDive = useCallback(async (candidate: Candidate) => {
+    setDeepDiveLoadingId(candidate.id);
+    try {
+      const res = await fetch("/api/deep-dive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidate, userContext: userContext.trim() || undefined }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "深掘り評価に失敗しました");
+      }
+      const { candidate: updated } = await res.json();
+      setResult((prev) => {
+        if (!prev) return prev;
+        const next = {
+          ...prev,
+          candidates: prev.candidates.map((c) => (c.id === updated.id ? updated : c)),
+        };
+        saveHistory(next);
+        setHistory(loadHistory());
+        return next;
+      });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "深掘り評価に失敗しました");
+    } finally {
+      setDeepDiveLoadingId(null);
+    }
+  }, [userContext]);
+
   const isDefaultWeights = WEIGHT_KEYS.every((k) => weights[k] === 1);
 
   const { tier1, tier2, tier3 } = useMemo(() => {
@@ -167,8 +198,7 @@ export default function Home() {
 
     if (sourceFilter !== "all") list = list.filter((c) => c.source === sourceFilter);
     if (categoryFilter !== "all") list = list.filter((c) => (c.marketCategory ?? "other") === categoryFilter);
-    if (gateFilter === "pass") list = list.filter((c) => c.gate.pass);
-    else if (gateFilter === "fail") list = list.filter((c) => !c.gate.pass);
+    if (gateFilter !== "all") list = list.filter((c) => c.gate.result === gateFilter);
 
     const sorted = [...list].sort((a, b) => {
       const av = getScoreValue(a, sortKey, weights);
@@ -176,10 +206,11 @@ export default function Home() {
       return sortDir === "desc" ? bv - av : av - bv;
     });
 
-    const passed = sorted.filter((c) => c.gate.pass);
-    const failed = sorted.filter((c) => !c.gate.pass);
+    const passed = sorted.filter((c) => c.gate.result === "pass");
+    const maybe = sorted.filter((c) => c.gate.result === "maybe");
+    const failed = sorted.filter((c) => c.gate.result === "fail");
 
-    return { tier1: passed.slice(0, 3), tier2: passed.slice(3), tier3: failed };
+    return { tier1: passed.slice(0, 3), tier2: [...passed.slice(3), ...maybe], tier3: failed };
   }, [result?.candidates, gateFilter, sourceFilter, categoryFilter, sortKey, sortDir, weights]);
 
   const totalFiltered = tier1.length + tier2.length + tier3.length;
@@ -323,7 +354,7 @@ export default function Home() {
               Candidates ({totalFiltered} / {result.candidates.length})
             </h2>
             <div className="flex gap-2 text-xs">
-              {(["all", "pass", "fail"] as const).map((v) => (
+              {(["all", "pass", "maybe", "fail"] as const).map((v) => (
                 <button
                   key={v}
                   onClick={() => setGateFilter(v)}
@@ -415,12 +446,14 @@ export default function Home() {
                   <th className="py-2 pr-3">#</th>
                   <th className="py-2 pr-3">Src</th>
                   <SortableTh label="Pop" sortKey="sourceScore" current={sortKey} dir={sortDir} onClick={handleSort} />
+                  <SortableTh label="注目" sortKey="overseasPopularity" current={sortKey} dir={sortDir} onClick={handleSort} />
                   <th className="py-2 pr-3">Title / タイトル</th>
                   <th className="py-2 pr-3">Gate</th>
                   <SortableTh label="速度" sortKey="traceSpeed" current={sortKey} dir={sortDir} onClick={handleSort} />
                   <SortableTh label="需要" sortKey="jpDemand" current={sortKey} dir={sortDir} onClick={handleSort} />
                   <SortableTh label="空白" sortKey="jpGap" current={sortKey} dir={sortDir} onClick={handleSort} />
                   <SortableTh label="Risk" sortKey="riskLow" current={sortKey} dir={sortDir} onClick={handleSort} />
+                  <th className="py-2 pr-1 text-xs" title="深掘り再評価">DD</th>
                   <SortableTh label="Total" sortKey="totalScore" current={sortKey} dir={sortDir} onClick={handleSort} />
                 </tr>
               </thead>
@@ -428,7 +461,7 @@ export default function Home() {
                 {tier1.length > 0 && (
                   <>
                     <tr>
-                      <td colSpan={10} className="pt-2 pb-1 px-1">
+                      <td colSpan={12} className="pt-2 pb-1 px-1">
                         <span className="text-[10px] font-bold text-tier1-accent uppercase tracking-wider">Tier 1 — 注目</span>
                       </td>
                     </tr>
@@ -442,6 +475,8 @@ export default function Home() {
                         isExpanded={expandedId === c.id}
                         onToggle={() => setExpandedId(expandedId === c.id ? null : c.id)}
                         weights={weights}
+                        onDeepDive={handleDeepDive}
+                        isDeepDiving={deepDiveLoadingId === c.id}
                       />
                     ))}
                   </>
@@ -449,7 +484,7 @@ export default function Home() {
                 {tier2.length > 0 && (
                   <>
                     <tr>
-                      <td colSpan={10} className="pt-4 pb-1 px-1">
+                      <td colSpan={12} className="pt-4 pb-1 px-1">
                         <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Tier 2 — 候補 ({tier2.length}件)</span>
                       </td>
                     </tr>
@@ -463,6 +498,8 @@ export default function Home() {
                         isExpanded={expandedId === c.id}
                         onToggle={() => setExpandedId(expandedId === c.id ? null : c.id)}
                         weights={weights}
+                        onDeepDive={handleDeepDive}
+                        isDeepDiving={deepDiveLoadingId === c.id}
                       />
                     ))}
                   </>
@@ -470,7 +507,7 @@ export default function Home() {
                 {tier3.length > 0 && (
                   <>
                     <tr>
-                      <td colSpan={10} className="pt-4 pb-1 px-1">
+                      <td colSpan={12} className="pt-4 pb-1 px-1">
                         {gateFilter === "all" ? (
                           <button
                             onClick={() => setShowFailedTier((v) => !v)}
@@ -495,6 +532,8 @@ export default function Home() {
                         isExpanded={expandedId === c.id}
                         onToggle={() => setExpandedId(expandedId === c.id ? null : c.id)}
                         weights={weights}
+                        onDeepDive={handleDeepDive}
+                        isDeepDiving={deepDiveLoadingId === c.id}
                       />
                     ))}
                   </>

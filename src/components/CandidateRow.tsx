@@ -1,10 +1,10 @@
 import type { Candidate } from "@/lib/types";
-import { SOURCE_BADGE, safeHref } from "@/lib/constants";
+import { SOURCE_BADGE, GATE_BADGE, safeHref } from "@/lib/constants";
 import { CATEGORY_BADGE } from "@/lib/categories";
 import { type ScoreWeights, calcWeightedTotal } from "@/lib/scores";
 import { ScoreBar } from "./ScoreBar";
 import { ExpandedDetails } from "./ExpandedDetails";
-import { ChevronRight, ChevronDown } from "lucide-react";
+import { ChevronRight, ChevronDown, Search, Loader2 } from "lucide-react";
 
 export function CandidateRow({
   candidate: c,
@@ -14,6 +14,8 @@ export function CandidateRow({
   isExpanded,
   onToggle,
   weights,
+  onDeepDive,
+  isDeepDiving,
 }: {
   candidate: Candidate;
   rank: number;
@@ -22,6 +24,8 @@ export function CandidateRow({
   isExpanded: boolean;
   onToggle: () => void;
   weights: ScoreWeights;
+  onDeepDive?: (candidate: Candidate) => void;
+  isDeepDiving?: boolean;
 }) {
   const { label, color } = SOURCE_BADGE[c.source];
   const catBadge = CATEGORY_BADGE[c.marketCategory ?? "other"];
@@ -69,6 +73,9 @@ export function CandidateRow({
         <td className="py-2 pr-1 text-center text-xs text-text-secondary font-mono">
           {c.sourceScore != null ? c.sourceScore.toLocaleString() : "-"}
         </td>
+        <td className="py-2 pr-1 text-center text-xs text-text-secondary font-mono">
+          {c.overseasPopularity != null ? `${(c.overseasPopularity * 100).toFixed(0)}%` : "-"}
+        </td>
         <td className="py-2 pr-3 max-w-md">
           <a
             href={safeHref(c.url)}
@@ -97,11 +104,9 @@ export function CandidateRow({
         </td>
         <td className="py-2 pr-3">
           <span
-            className={`text-xs px-1.5 py-0.5 rounded ${
-              c.gate.pass ? "bg-green-900 text-green-300" : "bg-surface-overlay text-text-muted"
-            }`}
+            className={`text-xs px-1.5 py-0.5 rounded ${GATE_BADGE[c.gate.result].color}`}
           >
-            {c.gate.pass ? "PASS" : "FAIL"}
+            {GATE_BADGE[c.gate.result].label}
           </span>
         </td>
         <td className="py-2 pr-1">
@@ -116,13 +121,25 @@ export function CandidateRow({
         <td className="py-2 pr-1">
           {c.scores ? <ScoreBar score={c.scores.riskLow.score} /> : <span className="text-text-muted text-center block">-</span>}
         </td>
+        <td className="py-2 pr-1 text-center">
+          {c.gate.result !== "fail" && !c.deepDived && onDeepDive && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDeepDive(c); }}
+              disabled={isDeepDiving}
+              className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-900 text-cyan-300 hover:bg-cyan-800 disabled:opacity-50 transition-colors cursor-pointer"
+              title="深掘り再評価"
+            >
+              {isDeepDiving ? <Loader2 size={10} className="animate-spin" /> : <Search size={10} />}
+            </button>
+          )}
+        </td>
         <td className={`py-2 text-center font-semibold ${tier === 1 ? "text-tier1-accent" : ""}`}>
           {wTotal > 0 ? (Number.isInteger(wTotal) ? wTotal : wTotal.toFixed(1)) : "-"}
         </td>
       </tr>
       {isExpanded && (
         <tr className="bg-surface-raised/80">
-          <td colSpan={10} className="px-4 py-3">
+          <td colSpan={12} className="px-4 py-3">
             <ExpandedDetails candidate={c} />
           </td>
         </tr>
