@@ -145,7 +145,7 @@ async function evaluateBatch(
   const prompt = buildEvalPrompt(items.length, JSON.stringify(input), userContext);
   let text: string;
   try {
-    text = await callOpenAI(client, prompt, 4096, signal);
+    text = await callOpenAI(client, prompt, 8192, signal);
   } catch (e) {
     errors.push(e instanceof Error ? e.message : String(e));
     return { candidates: items.map((it) => fallbackCandidate(it)), errors };

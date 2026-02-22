@@ -26,10 +26,13 @@ function sseEvent(data: Record<string, unknown>): string {
 
 export async function POST(request: Request) {
   const encoder = new TextEncoder();
-  const { signal } = request;
+  // クライアント切断時にLLM呼出を停止するための内部AbortController
+  const internal = new AbortController();
+  request.signal.addEventListener("abort", () => internal.abort(), { once: true });
 
   const stream = new ReadableStream({
     async start(controller) {
+      const signal = internal.signal;
       const send = (step: string, message: string, extra?: Record<string, unknown>) => {
         if (signal.aborted) return;
         controller.enqueue(encoder.encode(sseEvent({ step, message, ...extra })));
@@ -171,6 +174,9 @@ export async function POST(request: Request) {
       } finally {
         controller.close();
       }
+    },
+    cancel() {
+      internal.abort();
     },
   });
 

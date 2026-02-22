@@ -1,14 +1,21 @@
 import type { MvpPlan, RunResult } from "./types";
 
+/** Escape markdown special characters in LLM-generated text */
+function escMd(text: string): string {
+  return text
+    .replace(/\\/g, "\\\\")
+    .replace(/([*_~`\[\]#|>])/g, "\\$1");
+}
+
 export function planToMarkdown(plan: MvpPlan, rank: number): string {
-  return `## #${rank} ${plan.title}
+  return `## #${rank} ${escMd(plan.title)}
 
 - **元プロダクト:** ${plan.originalUrl}
-- **日本ターゲット:** ${plan.jpTarget}
-- **ローカライズ:** ${plan.localization}
-- **技術アプローチ:** ${plan.techApproach}
-- **ローンチ計画:** ${plan.launchPlan}
-- **マネタイズ:** ${plan.monetization}
+- **日本ターゲット:** ${escMd(plan.jpTarget)}
+- **ローカライズ:** ${escMd(plan.localization)}
+- **技術アプローチ:** ${escMd(plan.techApproach)}
+- **ローンチ計画:** ${escMd(plan.launchPlan)}
+- **マネタイズ:** ${escMd(plan.monetization)}
 `;
 }
 
@@ -22,7 +29,7 @@ export function resultToMarkdown(result: RunResult): string {
     });
   }
 
-  const esc = (s: string) => s.replace(/\|/g, "\\|").replace(/\n/g, " ");
+  const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\n/g, " ");
   const passed = result.candidates.filter((c) => c.gate.pass);
   if (passed.length > 0) {
     lines.push("## PASS 候補一覧", "");
@@ -56,5 +63,5 @@ export function downloadMarkdown(result: RunResult) {
   a.href = url;
   a.download = `contents-hacker-${new Date().toISOString().slice(0, 10)}.md`;
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }

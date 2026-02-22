@@ -28,7 +28,8 @@ export function deduplicateAndTrim(items: NormalizedItem[]): NormalizedItem[] {
       u.searchParams.delete("utm_source");
       u.searchParams.delete("utm_medium");
       u.searchParams.delete("utm_campaign");
-      key = u.origin + u.pathname.replace(/\/$/, "") + u.search;
+      const host = u.host.replace(/^www\./, "");
+      key = `${u.protocol}//${host}${u.pathname.replace(/\/$/, "")}${u.search}`;
     } catch {
       key = item.url.replace(/\/$/, "").toLowerCase();
     }

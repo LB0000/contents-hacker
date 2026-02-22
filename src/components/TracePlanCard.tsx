@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { MvpPlan } from "@/lib/types";
 import { planToMarkdown } from "@/lib/markdown";
+import { safeHref } from "@/lib/constants";
 import { Copy, ClipboardCheck } from "lucide-react";
 
 export function TracePlanCard({ plan, rank }: { plan: MvpPlan; rank: number }) {
@@ -29,13 +30,14 @@ export function TracePlanCard({ plan, rank }: { plan: MvpPlan; rank: number }) {
           onClick={handleCopy}
           className="p-1.5 rounded bg-surface-overlay text-text-muted hover:bg-surface-hover hover:text-text-primary transition-colors duration-150 shrink-0"
           title="Markdownでコピー"
+          aria-label="Markdownでコピー"
         >
           {copied ? <ClipboardCheck size={14} /> : <Copy size={14} />}
         </button>
       </div>
       <dl className="text-xs text-text-secondary space-y-2">
         {[
-          { label: "元プロダクト", value: <a href={plan.originalUrl} target="_blank" rel="noopener noreferrer" className="text-primary-light hover:underline break-all">{plan.originalUrl}</a> },
+          { label: "元プロダクト", value: <a href={safeHref(plan.originalUrl)} target="_blank" rel="noopener noreferrer" className="text-primary-light hover:underline break-all">{plan.originalUrl}</a> },
           { label: "日本ターゲット", value: plan.jpTarget },
           { label: "ローカライズ", value: plan.localization },
           { label: "技術アプローチ", value: plan.techApproach },

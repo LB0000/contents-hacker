@@ -12,15 +12,24 @@ export function loadHistory(): RunHistory[] {
   try {
     const raw = localStorage.getItem(HISTORY_KEY);
     if (!raw) return [];
-    const parsed: RunHistory[] = JSON.parse(raw);
-    // 旧データ互換: marketCategory が無い候補に "other" を補完
-    return parsed.map((h) => ({
-      ...h,
-      candidates: h.candidates.map((c) => ({
-        ...c,
-        marketCategory: c.marketCategory ?? "other" as const,
-      })),
-    }));
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (h: unknown): h is RunHistory =>
+          typeof h === "object" &&
+          h !== null &&
+          typeof (h as Record<string, unknown>).timestamp === "string" &&
+          Array.isArray((h as Record<string, unknown>).candidates)
+      )
+      .map((h) => ({
+        ...h,
+        topPlans: Array.isArray(h.topPlans) ? h.topPlans : [],
+        candidates: h.candidates.map((c) => ({
+          ...c,
+          marketCategory: c.marketCategory ?? ("other" as const),
+        })),
+      }));
   } catch {
     return [];
   }

@@ -1,5 +1,5 @@
 import type { Candidate } from "@/lib/types";
-import { SOURCE_BADGE } from "@/lib/constants";
+import { SOURCE_BADGE, safeHref } from "@/lib/constants";
 import { CATEGORY_BADGE } from "@/lib/categories";
 import { type ScoreWeights, calcWeightedTotal } from "@/lib/scores";
 import { ScoreBar } from "./ScoreBar";
@@ -40,7 +40,6 @@ export function CandidateRow({
         onClick={onToggle}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(); } }}
         tabIndex={0}
-        role="button"
         aria-expanded={isExpanded}
       >
         <td className="py-2 pr-3 text-text-muted">
@@ -72,7 +71,7 @@ export function CandidateRow({
         </td>
         <td className="py-2 pr-3 max-w-md">
           <a
-            href={c.url}
+            href={safeHref(c.url)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-primary-light hover:underline block truncate"

@@ -45,7 +45,7 @@ export default function Home() {
     return () => { abortRef.current?.abort(); };
   }, []);
 
-  const previousIds = getPreviousIds(history, compareIndex);
+  const previousIds = useMemo(() => getPreviousIds(history, compareIndex), [history, compareIndex]);
 
   const handleRun = useCallback(async () => {
     abortRef.current?.abort();
@@ -58,19 +58,20 @@ export default function Home() {
     setProgressSteps(INITIAL_STEPS);
     setExpandedId(null);
 
+    const timeoutId = setTimeout(() => controller.abort(), 130_000);
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+
     try {
-      const timeoutId = setTimeout(() => controller.abort(), 130_000);
       const res = await fetch("/api/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userContext: userContext.trim() || undefined }),
         signal: controller.signal,
       });
-      clearTimeout(timeoutId);
       if (!res.ok) throw new Error(`サーバーエラー: ${res.status}`);
       if (!res.body) throw new Error("No response body");
 
-      const reader = res.body.getReader();
+      reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
 
@@ -112,13 +113,17 @@ export default function Home() {
         }
       }
     } catch (e) {
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted) {
+        reader?.cancel().catch(() => {});
+        return;
+      }
       setResult({
         candidates: [],
         topPlans: [],
         errors: [e instanceof Error ? e.message : "不明なエラーが発生しました"],
       });
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
       setProgress("");
     }
@@ -199,7 +204,7 @@ export default function Home() {
           />
           {loading ? (
             <button
-              onClick={() => { abortRef.current?.abort(); setLoading(false); setProgress(""); }}
+              onClick={() => { abortRef.current?.abort(); }}
               className="px-6 py-2.5 bg-red-700 hover:bg-red-600 rounded-lg font-medium transition-colors duration-200 cursor-pointer text-white"
             >
               <span className="flex items-center gap-2">

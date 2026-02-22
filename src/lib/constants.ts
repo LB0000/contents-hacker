@@ -27,3 +27,12 @@ export const HISTORY_KEY = "ch-history";
 export const MAX_HISTORY = 5;
 
 export type SortKey = "totalScore" | "traceSpeed" | "jpDemand" | "jpGap" | "riskLow" | "sourceScore";
+
+/** Validates that a URL uses http(s) scheme. Returns "#" for unsafe URLs. */
+export function safeHref(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.protocol === "http:" || u.protocol === "https:") return url;
+  } catch { /* invalid URL */ }
+  return "#";
+}

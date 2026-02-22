@@ -13,7 +13,6 @@
   "license": "ISC",
   "packageManager": "pnpm@10.30.1",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.78.0",
     "lucide-react": "^0.575.0",
     "next": "^16.1.6",
     "openai": "^6.22.0",

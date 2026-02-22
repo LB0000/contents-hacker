@@ -84,8 +84,12 @@ async function fetchSubredditRss(subreddit: string, limit: number): Promise<Norm
           return !isNaN(published) && published >= fourteenDaysAgo;
         })
         .slice(0, limit)
-        .map((item, i) => ({
-          id: `rd-${subreddit}-${item.link.replace(/\/+$/, "").split("/").pop() || String(i)}`,
+        .map((item) => {
+          // Extract Reddit post ID from URL: /r/{subreddit}/comments/{id}/...
+          const commentMatch = item.link.match(/\/comments\/([a-z0-9]+)/i);
+          const postId = commentMatch ? commentMatch[1] : `${subreddit}-${item.link.replace(/\/+$/, "").split("/").pop() || "unknown"}`;
+          return {
+          id: `rd-${postId}`,
           source: "reddit" as const,
           title_en: decodeHtmlEntities(item.title),
           desc_en: decodeHtmlEntities(item.description).slice(0, 400),
@@ -94,7 +98,8 @@ async function fetchSubredditRss(subreddit: string, limit: number): Promise<Norm
           publishedAt: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
           sourceScore: null, // RSSにはスコア情報なし
           marketCategory: "other",
-        }));
+          };
+        });
     }
     // RSS失敗 → JSONフォールバックへ
   } catch {
