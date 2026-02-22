@@ -73,9 +73,18 @@ function buildEvalPrompt(itemCount: number, inputJson: string, userContext?: str
    - jpGap: { score: 0-5, reason_ja, confidence } — 日本空白度: 日本に同様のサービスが存在しないか (5=完全空白, 3=弱い競合あり, 0=大手が展開済み)。jpCompetitors の内容を根拠にスコアを判定すること。
    - riskLow: { score: 0-5, reason_ja, confidence } — リスク低: 法規制・API依存・技術的リスクが低いか (5=リスクなし, 0=高リスク)
 5. jpCompetitors: string[] — 日本で同様のサービスを提供している既知の競合を最大3つ列挙。なければ空配列。確信がある場合のみ列挙し、推測や存在が不確かなサービスは含めないこと。
+6. marketCategory: string — このプロダクトの市場カテゴリ。入力の hintCategory を参考にしつつ、以下から最も適切な1つを選択:
+   - "ai-tool": AI系ツール（LLMラッパー、AI SaaS、AIエージェント）
+   - "ec-optimize": EC最適化（決済、物流、在庫、商品管理）
+   - "analog-dx": アナログ業界DX（建設、不動産、飲食、農業、医療等のデジタル化）
+   - "info-gap-ai": 情報格差×AI（非技術者向けAI、ノーコード、中小企業向け）
+   - "marketplace": マーケットプレイス（マッチング、C2C、フリーランス）
+   - "vertical-saas": バーティカルSaaS（業界特化B2Bツール、HR、会計、法務）
+   - "devtool": 開発ツール（SDK、API、CLI、インフラ、CI/CD）
+   - "other": 上記に当てはまらないもの
 
 必ず以下の形式のJSONオブジェクトで返してください:
-{"items":[{"index":0,"title_ja":"...","desc_ja":"...","gate":{"pass":true,"reason_ja":"..."},"scores":{"traceSpeed":{"score":4,"reason_ja":"...","confidence":"high"},"jpDemand":{"score":3,"reason_ja":"...","confidence":"medium"},"jpGap":{"score":5,"reason_ja":"...","confidence":"high"},"riskLow":{"score":4,"reason_ja":"...","confidence":"high"}},"jpCompetitors":["サービスA","サービスB"]}]}
+{"items":[{"index":0,"title_ja":"...","desc_ja":"...","gate":{"pass":true,"reason_ja":"..."},"scores":{"traceSpeed":{"score":4,"reason_ja":"...","confidence":"high"},"jpDemand":{"score":3,"reason_ja":"...","confidence":"medium"},"jpGap":{"score":5,"reason_ja":"...","confidence":"high"},"riskLow":{"score":4,"reason_ja":"...","confidence":"high"}},"jpCompetitors":["サービスA","サービスB"],"marketCategory":"ec-optimize"}]}
 ${userContextBlock}
 Items:
 ${inputJson}`;
@@ -130,6 +139,7 @@ async function evaluateBatch(
     desc_en: it.desc_en.slice(0, 400),
     tags: it.tags.slice(0, 8),
     source: it.source,
+    hintCategory: it.marketCategory,
   }));
 
   const prompt = buildEvalPrompt(items.length, JSON.stringify(input), userContext);
@@ -204,6 +214,7 @@ async function evaluateBatch(
       totalScore,
       jpCompetitors: ev.jpCompetitors,
       deepDived: false,
+      marketCategory: ev.marketCategory ?? it.marketCategory,
     };
   });
 
@@ -227,6 +238,7 @@ function fallbackCandidate(it: NormalizedItem): Candidate {
     totalScore: 0,
     jpCompetitors: [],
     deepDived: false,
+    marketCategory: it.marketCategory,
   };
 }
 

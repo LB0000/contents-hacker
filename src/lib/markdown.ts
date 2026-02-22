@@ -26,14 +26,14 @@ export function resultToMarkdown(result: RunResult): string {
   const passed = result.candidates.filter((c) => c.gate.pass);
   if (passed.length > 0) {
     lines.push("## PASS 候補一覧", "");
-    lines.push("| # | Src | Title | 速度 | 需要 | 空白 | Risk | Total |");
-    lines.push("|---|-----|-------|------|------|------|------|-------|");
+    lines.push("| # | Src | Cat | Title | 速度 | 需要 | 空白 | Risk | Total |");
+    lines.push("|---|-----|-----|-------|------|------|------|------|-------|");
     passed
       .sort((a, b) => b.totalScore - a.totalScore)
       .forEach((c, i) => {
         const s = c.scores;
         lines.push(
-          `| ${i + 1} | ${c.source} | ${esc(c.title_ja)} | ${s?.traceSpeed.score ?? "-"} | ${s?.jpDemand.score ?? "-"} | ${s?.jpGap.score ?? "-"} | ${s?.riskLow.score ?? "-"} | ${c.totalScore} |`
+          `| ${i + 1} | ${c.source} | ${c.marketCategory ?? "other"} | ${esc(c.title_ja)} | ${s?.traceSpeed.score ?? "-"} | ${s?.jpDemand.score ?? "-"} | ${s?.jpGap.score ?? "-"} | ${s?.riskLow.score ?? "-"} | ${c.totalScore} |`
         );
       });
     lines.push("");

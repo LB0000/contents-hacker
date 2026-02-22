@@ -11,7 +11,16 @@ export function loadHistory(): RunHistory[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(HISTORY_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed: RunHistory[] = JSON.parse(raw);
+    // 旧データ互換: marketCategory が無い候補に "other" を補完
+    return parsed.map((h) => ({
+      ...h,
+      candidates: h.candidates.map((c) => ({
+        ...c,
+        marketCategory: c.marketCategory ?? "other" as const,
+      })),
+    }));
   } catch {
     return [];
   }

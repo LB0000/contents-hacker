@@ -1,3 +1,5 @@
+import type { MarketCategory } from "./categories";
+
 /** ソースから取得した生データを正規化した共通型 */
 export interface NormalizedItem {
   id: string;
@@ -8,6 +10,7 @@ export interface NormalizedItem {
   tags: string[];
   publishedAt: string;
   sourceScore: number | null;
+  marketCategory: MarketCategory;
 }
 
 export type SourceType = NormalizedItem["source"];
@@ -50,6 +53,7 @@ export interface Candidate {
   totalScore: number;
   jpCompetitors: string[]; // 日本の既知競合サービス名
   deepDived: boolean; // トリアージ深掘り済みか
+  marketCategory: MarketCategory;
 }
 
 /** 上位3件のトレース計画 */

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type { RunResult, SourceType } from "@/lib/types";
+import { MARKET_CATEGORIES, CATEGORY_BADGE, type MarketCategory } from "@/lib/categories";
 import { SOURCE_BADGE, WEIGHT_LABELS, WEIGHT_KEYS, WEIGHTS_KEY, type SortKey } from "@/lib/constants";
 import { type RunHistory, loadHistory, saveHistory, getPreviousIds } from "@/lib/history";
 import { type ScoreWeights, DEFAULT_WEIGHTS, loadWeights, getScoreValue } from "@/lib/scores";
@@ -29,6 +30,7 @@ export default function Home() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [gateFilter, setGateFilter] = useState<"all" | "pass" | "fail">("all");
   const [sourceFilter, setSourceFilter] = useState<SourceType | "all">("all");
+  const [categoryFilter, setCategoryFilter] = useState<MarketCategory | "all">("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [weights, setWeights] = useState<ScoreWeights>(DEFAULT_WEIGHTS);
   const [showWeights, setShowWeights] = useState(false);
@@ -159,6 +161,7 @@ export default function Home() {
     let list = result.candidates;
 
     if (sourceFilter !== "all") list = list.filter((c) => c.source === sourceFilter);
+    if (categoryFilter !== "all") list = list.filter((c) => (c.marketCategory ?? "other") === categoryFilter);
     if (gateFilter === "pass") list = list.filter((c) => c.gate.pass);
     else if (gateFilter === "fail") list = list.filter((c) => !c.gate.pass);
 
@@ -172,7 +175,7 @@ export default function Home() {
     const failed = sorted.filter((c) => !c.gate.pass);
 
     return { tier1: passed.slice(0, 3), tier2: passed.slice(3), tier3: failed };
-  }, [result?.candidates, gateFilter, sourceFilter, sortKey, sortDir, weights]);
+  }, [result?.candidates, gateFilter, sourceFilter, categoryFilter, sortKey, sortDir, weights]);
 
   const totalFiltered = tier1.length + tier2.length + tier3.length;
 
@@ -340,6 +343,20 @@ export default function Home() {
                   }`}
                 >
                   {v === "all" ? "ALL" : SOURCE_BADGE[v].label}
+                </button>
+              ))}
+              <span className="text-border-default">|</span>
+              {(["all", ...MARKET_CATEGORIES] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setCategoryFilter(v)}
+                  className={`px-2 py-1 rounded cursor-pointer transition-colors duration-150 ${
+                    categoryFilter === v
+                      ? "bg-primary text-white"
+                      : "bg-surface-overlay text-text-secondary hover:bg-surface-hover"
+                  }`}
+                >
+                  {v === "all" ? "ALL" : CATEGORY_BADGE[v].label}
                 </button>
               ))}
             </div>

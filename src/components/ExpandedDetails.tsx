@@ -1,5 +1,6 @@
 import type { Candidate } from "@/lib/types";
 import { CONFIDENCE_BADGE } from "@/lib/constants";
+import { CATEGORY_BADGE } from "@/lib/categories";
 
 export function ExpandedDetails({ candidate: c }: { candidate: Candidate }) {
   return (
@@ -32,6 +33,12 @@ export function ExpandedDetails({ candidate: c }: { candidate: Candidate }) {
           )}
         </>
       )}
+      <div>
+        <span className="text-text-muted font-medium">カテゴリ:</span>{" "}
+        <span className={`px-1.5 py-0.5 rounded ${CATEGORY_BADGE[c.marketCategory ?? "other"].color}`}>
+          {CATEGORY_BADGE[c.marketCategory ?? "other"].label}
+        </span>
+      </div>
       <div>
         <span className="text-text-muted font-medium">日本競合:</span>{" "}
         {c.jpCompetitors.length > 0 ? c.jpCompetitors.join(", ") : "なし（空白市場）"}

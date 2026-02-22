@@ -1,5 +1,6 @@
 import type { Candidate } from "@/lib/types";
 import { SOURCE_BADGE } from "@/lib/constants";
+import { CATEGORY_BADGE } from "@/lib/categories";
 import { type ScoreWeights, calcWeightedTotal } from "@/lib/scores";
 import { ScoreBar } from "./ScoreBar";
 import { ExpandedDetails } from "./ExpandedDetails";
@@ -23,6 +24,7 @@ export function CandidateRow({
   weights: ScoreWeights;
 }) {
   const { label, color } = SOURCE_BADGE[c.source];
+  const catBadge = CATEGORY_BADGE[c.marketCategory ?? "other"];
   const wTotal = calcWeightedTotal(c, weights);
 
   const tierStyle = tier === 1
@@ -60,6 +62,9 @@ export function CandidateRow({
         <td className="py-2 pr-3">
           <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${color}`}>
             {label}
+          </span>
+          <span className={`text-[9px] px-1 py-0.5 rounded ml-1 ${catBadge.color}`}>
+            {catBadge.label}
           </span>
         </td>
         <td className="py-2 pr-1 text-center text-xs text-text-secondary font-mono">

@@ -76,5 +76,6 @@ export async function fetchProductHunt(limit: number): Promise<NormalizedItem[]>
       tags: [],
       publishedAt: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
       sourceScore: null,
+      marketCategory: "other",
     }));
 }

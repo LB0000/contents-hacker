@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MARKET_CATEGORIES } from "../categories";
 
 /** LLM 1回目: 翻訳 + 関門 + 採点 + 競合チェック の1件分 */
 export const EvalItemSchema = z.object({
@@ -18,6 +19,7 @@ export const EvalItemSchema = z.object({
     })
     .nullable(),
   jpCompetitors: z.array(z.string()).optional().default([]),
+  marketCategory: z.enum(MARKET_CATEGORIES).catch("other").optional().default("other"),
 }).refine(
   (data) => !data.gate.pass || data.scores !== null,
   { message: "scores must not be null when gate.pass is true" }

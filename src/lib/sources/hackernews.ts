@@ -61,5 +61,6 @@ export async function fetchHackerNews(limit: number): Promise<NormalizedItem[]> 
       tags: [],
       publishedAt: it.time ? new Date(it.time * 1000).toISOString() : new Date().toISOString(),
       sourceScore: it.score ?? null,
+      marketCategory: "other",
     }));
 }

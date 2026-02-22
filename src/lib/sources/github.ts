@@ -50,5 +50,6 @@ export async function fetchGitHub(limit: number): Promise<NormalizedItem[]> {
       tags: repo.topics?.slice(0, 8) ?? [],
       publishedAt: repo.created_at,
       sourceScore: repo.stargazers_count,
+      marketCategory: "other",
     }));
 }
