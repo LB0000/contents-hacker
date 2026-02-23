@@ -43,12 +43,16 @@ export async function POST(request: Request) {
       };
 
       try {
-        // 0. リクエストボディからユーザーコンテキストを取得
+        // 0. リクエストボディからユーザーコンテキストとフィードバック例を取得
         let userContext: string | undefined;
+        let feedbackExamples: string | undefined;
         try {
           const body = await request.json();
           if (body?.userContext && typeof body.userContext === "string" && body.userContext.trim()) {
             userContext = body.userContext.trim();
+          }
+          if (body?.feedbackExamples && typeof body.feedbackExamples === "string" && body.feedbackExamples.trim()) {
+            feedbackExamples = body.feedbackExamples.trim();
           }
         } catch {
           // body が空でも問題なし
@@ -119,7 +123,7 @@ export async function POST(request: Request) {
         // 3. LLM 評価
         send("eval", `LLM で評価中 (${trimmed.length}件)...`);
 
-        const { candidates: evalCandidates, errors: evalErrors } = await evaluateAll(client, trimmed, userContext, signal);
+        const { candidates: evalCandidates, errors: evalErrors } = await evaluateAll(client, trimmed, userContext, signal, feedbackExamples);
         errors.push(...evalErrors);
 
         if (signal.aborted) return;

@@ -77,3 +77,118 @@ export interface RunResult {
   topPlans: MvpPlan[];
   errors: string[];
 }
+
+// ── Phase 1: 継続学習ループ ──
+
+/** ユーザーのフィードバックステータス */
+export type FeedbackStatus = "considering" | "started" | "skipped" | "succeeded" | "failed";
+
+/** フィードバック1件分 */
+export interface FeedbackEntry {
+  candidateId: string;
+  title_en: string;
+  title_ja: string;
+  marketCategory: MarketCategory;
+  predictedScores: {
+    jpDemand: number;
+    jpGap: number;
+    traceSpeed: number;
+    riskLow: number;
+    totalScore: number;
+  };
+  status: FeedbackStatus;
+  reason?: string;
+  timestamp: string;
+}
+
+// ── Phase 2: 市場シミュレーション ──
+
+export interface KpiScenario {
+  mau: number;
+  mrr: number;
+  cvr: number;
+}
+
+export interface MarketSimulation {
+  candidateId: string;
+  tam: string;
+  sam: string;
+  som: string;
+  scenarios: {
+    optimistic: KpiScenario;
+    base: KpiScenario;
+    pessimistic: KpiScenario;
+  };
+  timeframe: "6months";
+  riskFactors: string[];
+  referenceCases: string[];
+  reasoning: string;
+}
+
+// ── Phase 3: ビジュアルマップUI ──
+
+export type MapAxis = "jpDemand" | "jpGap" | "traceSpeed" | "riskLow" | "overseasPopularity" | "totalScore";
+
+export type MapColorBy = "gate" | "category" | "source";
+
+// ── Phase 4: ベクトル検索 ──
+
+export interface CaseEntry {
+  id: string;
+  originalProduct: string;
+  jpTraceProduct: string;
+  category: MarketCategory;
+  outcome: "success" | "failure" | "ongoing";
+  summary: string;
+  embedding: number[];
+  yearLaunched: number;
+  lessonsLearned: string;
+}
+
+export interface SimilarCase {
+  caseEntry: CaseEntry;
+  similarity: number;
+  signal: "boost" | "warning" | "neutral";
+}
+
+// ── Phase 5: プロダクト融合 ──
+
+export interface FusionIdea {
+  candidateA: { id: string; title_ja: string };
+  candidateB: { id: string; title_ja: string };
+  fusionName: string;
+  concept: string;
+  jpTarget: string;
+  feasibility: number; // 1-5
+  novelty: number; // 1-5
+  reasoning: string;
+}
+
+// ── Phase 6: ローンチパッド ──
+
+export interface LaunchPadSpec {
+  planId: string;
+  designTokens: {
+    primaryColor: string;
+    fontFamily: string;
+    heroHeadline: string;
+    heroSubline: string;
+    features: string[];
+    ctaText: string;
+  };
+  lpHtml: string;
+  scaffoldFiles: ScaffoldFile[];
+}
+
+export interface ScaffoldFile {
+  path: string;
+  content: string;
+}
+
+/** バイアス分析レポート */
+export interface BiasReport {
+  sampleSize: number;
+  reliability: "low" | "medium" | "high";
+  axisAccuracy: Record<string, { predicted: number; actual: number; bias: number }>;
+  categoryBreakdown: Record<string, { succeeded: number; failed: number; total: number }>;
+}

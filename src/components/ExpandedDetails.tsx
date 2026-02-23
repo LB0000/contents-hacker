@@ -1,8 +1,24 @@
-import type { Candidate } from "@/lib/types";
+import type { Candidate, MarketSimulation, SimilarCase } from "@/lib/types";
 import { CONFIDENCE_BADGE } from "@/lib/constants";
 import { CATEGORY_BADGE } from "@/lib/categories";
+import { SimulationCard } from "./SimulationCard";
+import { SimilarCases } from "./SimilarCases";
 
-export function ExpandedDetails({ candidate: c }: { candidate: Candidate }) {
+export function ExpandedDetails({
+  candidate: c,
+  tier,
+  simulation,
+  isSimulating,
+  onSimulate,
+  similarCases,
+}: {
+  candidate: Candidate;
+  tier?: 1 | 2 | 3;
+  simulation?: MarketSimulation;
+  isSimulating?: boolean;
+  onSimulate?: () => void;
+  similarCases?: SimilarCase[];
+}) {
   return (
     <div className="text-xs text-text-secondary space-y-1.5 expand-enter">
       <div>
@@ -43,6 +59,20 @@ export function ExpandedDetails({ candidate: c }: { candidate: Candidate }) {
         <span className="text-text-muted font-medium">日本競合:</span>{" "}
         {c.jpCompetitors.length > 0 ? c.jpCompetitors.join(", ") : "なし（空白市場）"}
       </div>
+
+      {/* 類似トレース事例 */}
+      {similarCases && similarCases.length > 0 && (
+        <SimilarCases cases={similarCases} />
+      )}
+
+      {/* 市場シミュレーション（Tier1のみ） */}
+      {tier === 1 && onSimulate && (
+        <SimulationCard
+          simulation={simulation}
+          isLoading={isSimulating ?? false}
+          onRequest={onSimulate}
+        />
+      )}
     </div>
   );
 }

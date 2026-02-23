@@ -4,9 +4,17 @@ import { useState } from "react";
 import type { MvpPlan } from "@/lib/types";
 import { planToMarkdown } from "@/lib/markdown";
 import { safeHref } from "@/lib/constants";
-import { Copy, ClipboardCheck } from "lucide-react";
+import { Copy, ClipboardCheck, Rocket } from "lucide-react";
 
-export function TracePlanCard({ plan, rank }: { plan: MvpPlan; rank: number }) {
+export function TracePlanCard({
+  plan,
+  rank,
+  onLaunchPad,
+}: {
+  plan: MvpPlan;
+  rank: number;
+  onLaunchPad?: (plan: MvpPlan) => void;
+}) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -26,14 +34,26 @@ export function TracePlanCard({ plan, rank }: { plan: MvpPlan; rank: number }) {
           {rank}
         </span>
         <h3 className="font-semibold truncate flex-1">{plan.title}</h3>
-        <button
-          onClick={handleCopy}
-          className="p-1.5 rounded bg-surface-overlay text-text-muted hover:bg-surface-hover hover:text-text-primary transition-colors duration-150 shrink-0"
-          title="Markdownでコピー"
-          aria-label="Markdownでコピー"
-        >
-          {copied ? <ClipboardCheck size={14} /> : <Copy size={14} />}
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          {onLaunchPad && (
+            <button
+              onClick={() => onLaunchPad(plan)}
+              className="p-1.5 rounded bg-surface-overlay text-text-muted hover:bg-cta hover:text-white transition-colors duration-150"
+              title="LP + スキャフォールド生成"
+              aria-label="LP生成"
+            >
+              <Rocket size={14} />
+            </button>
+          )}
+          <button
+            onClick={handleCopy}
+            className="p-1.5 rounded bg-surface-overlay text-text-muted hover:bg-surface-hover hover:text-text-primary transition-colors duration-150"
+            title="Markdownでコピー"
+            aria-label="Markdownでコピー"
+          >
+            {copied ? <ClipboardCheck size={14} /> : <Copy size={14} />}
+          </button>
+        </div>
       </div>
       <dl className="text-xs text-text-secondary space-y-2">
         {[

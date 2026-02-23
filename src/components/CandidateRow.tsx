@@ -1,9 +1,10 @@
-import type { Candidate } from "@/lib/types";
+import type { Candidate, FeedbackStatus, MarketSimulation, SimilarCase } from "@/lib/types";
 import { SOURCE_BADGE, GATE_BADGE, safeHref } from "@/lib/constants";
 import { CATEGORY_BADGE } from "@/lib/categories";
 import { type ScoreWeights, calcWeightedTotal } from "@/lib/scores";
 import { ScoreBar } from "./ScoreBar";
 import { ExpandedDetails } from "./ExpandedDetails";
+import { FeedbackButtons } from "./FeedbackButtons";
 import { ChevronRight, ChevronDown, Search, Loader2 } from "lucide-react";
 
 export function CandidateRow({
@@ -16,6 +17,12 @@ export function CandidateRow({
   weights,
   onDeepDive,
   isDeepDiving,
+  feedbackStatus,
+  onFeedback,
+  simulation,
+  isSimulating,
+  onSimulate,
+  similarCases,
 }: {
   candidate: Candidate;
   rank: number;
@@ -26,6 +33,12 @@ export function CandidateRow({
   weights: ScoreWeights;
   onDeepDive?: (candidate: Candidate) => void;
   isDeepDiving?: boolean;
+  feedbackStatus?: FeedbackStatus;
+  onFeedback?: (candidateId: string, status: FeedbackStatus) => void;
+  simulation?: MarketSimulation;
+  isSimulating?: boolean;
+  onSimulate?: (candidate: Candidate) => void;
+  similarCases?: SimilarCase[];
 }) {
   const { label, color } = SOURCE_BADGE[c.source];
   const catBadge = CATEGORY_BADGE[c.marketCategory ?? "other"];
@@ -133,14 +146,29 @@ export function CandidateRow({
             </button>
           )}
         </td>
+        <td className="py-2 pr-1 text-center">
+          {c.gate.result !== "fail" && onFeedback && (
+            <FeedbackButtons
+              currentStatus={feedbackStatus}
+              onFeedback={(status) => onFeedback(c.id, status)}
+            />
+          )}
+        </td>
         <td className={`py-2 text-center font-semibold ${tier === 1 ? "text-tier1-accent" : ""}`}>
           {wTotal > 0 ? (Number.isInteger(wTotal) ? wTotal : wTotal.toFixed(1)) : "-"}
         </td>
       </tr>
       {isExpanded && (
         <tr className="bg-surface-raised/80">
-          <td colSpan={12} className="px-4 py-3">
-            <ExpandedDetails candidate={c} />
+          <td colSpan={13} className="px-4 py-3">
+            <ExpandedDetails
+              candidate={c}
+              tier={tier}
+              simulation={simulation}
+              isSimulating={isSimulating}
+              onSimulate={onSimulate ? () => onSimulate(c) : undefined}
+              similarCases={similarCases}
+            />
           </td>
         </tr>
       )}

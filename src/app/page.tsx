@@ -1,18 +1,25 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import type { RunResult, SourceType, Candidate } from "@/lib/types";
+import type { RunResult, SourceType, Candidate, FeedbackStatus, FeedbackEntry, MarketSimulation, MapAxis, MapColorBy, SimilarCase, FusionIdea, LaunchPadSpec, MvpPlan } from "@/lib/types";
 import { MARKET_CATEGORIES, CATEGORY_BADGE, type MarketCategory } from "@/lib/categories";
 import { SOURCE_BADGE, WEIGHT_LABELS, WEIGHT_KEYS, WEIGHTS_KEY, type SortKey } from "@/lib/constants";
 import { type RunHistory, loadHistory, saveHistory, getPreviousIds } from "@/lib/history";
 import { type ScoreWeights, DEFAULT_WEIGHTS, loadWeights, getScoreValue } from "@/lib/scores";
 import { type ProgressStep, INITIAL_STEPS, deriveSteps } from "@/lib/progress";
 import { downloadMarkdown } from "@/lib/markdown";
+import { loadFeedback, saveFeedback, createFeedbackEntry, buildFewShotExamples, feedbackStatusMap } from "@/lib/feedback";
+import { selectFusionPairs } from "@/lib/fusion";
 import { SortableTh } from "@/components/SortableTh";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorPanel } from "@/components/ErrorPanel";
 import { TracePlanCard } from "@/components/TracePlanCard";
 import { CandidateRow } from "@/components/CandidateRow";
+import { LearningReport } from "@/components/LearningReport";
+import { BubbleMap } from "@/components/BubbleMap";
+import { MapControls } from "@/components/MapControls";
+import { FusionSection } from "@/components/FusionSection";
+import { LaunchPadPanel } from "@/components/LaunchPadPanel";
 import {
   Play, Loader2, Download, History, Check,
   SlidersHorizontal, RotateCcw, Trophy, LayoutList,
@@ -37,14 +44,30 @@ export default function Home() {
   const [userContext, setUserContext] = useState("");
   const [showFailedTier, setShowFailedTier] = useState(false);
   const [deepDiveLoadingId, setDeepDiveLoadingId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackEntry[]>([]);
+  const [simulationData, setSimulationData] = useState<Map<string, MarketSimulation>>(new Map());
+  const [simulatingId, setSimulatingId] = useState<string | null>(null);
+  const [similarCasesMap, setSimilarCasesMap] = useState<Map<string, SimilarCase[]>>(new Map());
+  const [fusionIdeas, setFusionIdeas] = useState<FusionIdea[]>([]);
+  const [fusionLoading, setFusionLoading] = useState(false);
+  const [launchPadSpec, setLaunchPadSpec] = useState<LaunchPadSpec | null>(null);
+  const [launchPadLoading, setLaunchPadLoading] = useState(false);
+  const [showLaunchPad, setShowLaunchPad] = useState(false);
+  const [viewMode, setViewMode] = useState<"table" | "map">("table");
+  const [xAxis, setXAxis] = useState<MapAxis>("jpDemand");
+  const [yAxis, setYAxis] = useState<MapAxis>("jpGap");
+  const [colorBy, setColorBy] = useState<MapColorBy>("gate");
 
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     setHistory(loadHistory());
     setWeights(loadWeights());
+    setFeedback(loadFeedback());
     return () => { abortRef.current?.abort(); };
   }, []);
+
+  const fbStatusMap = useMemo(() => feedbackStatusMap(feedback), [feedback]);
 
   const previousIds = useMemo(() => getPreviousIds(history, compareIndex), [history, compareIndex]);
 
@@ -63,10 +86,14 @@ export default function Home() {
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
 
     try {
+      const feedbackExamples = buildFewShotExamples(feedback);
       const res = await fetch("/api/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userContext: userContext.trim() || undefined }),
+        body: JSON.stringify({
+          userContext: userContext.trim() || undefined,
+          ...(feedbackExamples ? { feedbackExamples } : {}),
+        }),
         signal: controller.signal,
       });
       if (!res.ok) throw new Error(`サーバーエラー: ${res.status}`);
@@ -103,6 +130,8 @@ export default function Home() {
                 saveHistory(data);
                 setHistory(loadHistory());
                 setCompareIndex(0);
+                // ベクトル検索: 類似事例を非同期で取得
+                fetchSimilarCases(data.candidates);
               }
             } else if (event.step === "error") {
               setResult({ candidates: [], topPlans: [], errors: [event.message] });
@@ -128,7 +157,7 @@ export default function Home() {
       setLoading(false);
       setProgress("");
     }
-  }, [userContext]);
+  }, [userContext, feedback]);
 
   function loadFromHistory(index: number) {
     const h = history[index];
@@ -136,6 +165,10 @@ export default function Home() {
     setResult({ candidates: h.candidates, topPlans: h.topPlans, errors: [] });
     setCompareIndex(index);
     setExpandedId(null);
+    setSimulationData(new Map());
+    setSimilarCasesMap(new Map());
+    setFusionIdeas([]);
+    setLaunchPadSpec(null);
   }
 
   function handleSort(key: SortKey) {
@@ -189,6 +222,118 @@ export default function Home() {
       setDeepDiveLoadingId(null);
     }
   }, [userContext]);
+
+  const handleFeedback = useCallback((candidateId: string, status: FeedbackStatus) => {
+    const candidate = result?.candidates.find((c) => c.id === candidateId);
+    if (!candidate) return;
+    const entry = createFeedbackEntry(candidate, status);
+    saveFeedback(entry);
+    setFeedback(loadFeedback());
+  }, [result?.candidates]);
+
+  const handleSimulate = useCallback(async (candidate: Candidate) => {
+    setSimulatingId(candidate.id);
+    try {
+      const res = await fetch("/api/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidate, userContext: userContext.trim() || undefined }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "シミュレーションに失敗しました");
+      }
+      const { simulation } = await res.json();
+      setSimulationData((prev) => new Map(prev).set(candidate.id, simulation));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "シミュレーションに失敗しました");
+    } finally {
+      setSimulatingId(null);
+    }
+  }, [userContext]);
+
+  const fetchSimilarCases = useCallback(async (candidates: Candidate[]) => {
+    try {
+      const passedOrMaybe = candidates.filter((c) => c.gate.result !== "fail");
+      if (passedOrMaybe.length === 0) return;
+      const res = await fetch("/api/embed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidates: passedOrMaybe.map((c) => ({
+            id: c.id,
+            title_en: c.title_en,
+            desc_en: c.desc_en ?? c.title_en,
+          })),
+        }),
+      });
+      if (!res.ok) return;
+      const { results } = await res.json();
+      const next = new Map<string, SimilarCase[]>();
+      for (const r of results) {
+        if (r.similarCases.length > 0) {
+          next.set(r.candidateId, r.similarCases);
+        }
+      }
+      setSimilarCasesMap(next);
+    } catch {
+      // embedding失敗は無視（機能劣化のみ）
+    }
+  }, []);
+
+  const handleFusion = useCallback(async () => {
+    if (!result?.candidates) return;
+    setFusionLoading(true);
+    try {
+      const pairs = selectFusionPairs(result.candidates);
+      if (pairs.length === 0) return;
+      const res = await fetch("/api/fusion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pairs: pairs.map((p) => ({
+            a: { id: p.a.id, title_en: p.a.title_en, title_ja: p.a.title_ja, desc_ja: p.a.desc_ja, marketCategory: p.a.marketCategory },
+            b: { id: p.b.id, title_en: p.b.title_en, title_ja: p.b.title_ja, desc_ja: p.b.desc_ja, marketCategory: p.b.marketCategory },
+          })),
+          userContext: userContext.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "融合生成に失敗しました");
+      }
+      const { fusions } = await res.json();
+      setFusionIdeas(fusions);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "融合生成に失敗しました");
+    } finally {
+      setFusionLoading(false);
+    }
+  }, [result?.candidates, userContext]);
+
+  const handleLaunchPad = useCallback(async (plan: MvpPlan) => {
+    setShowLaunchPad(true);
+    setLaunchPadLoading(true);
+    setLaunchPadSpec(null);
+    try {
+      const res = await fetch("/api/launchpad", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "ローンチパッド生成に失敗しました");
+      }
+      const { spec } = await res.json();
+      setLaunchPadSpec(spec);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "ローンチパッド生成に失敗しました");
+      setShowLaunchPad(false);
+    } finally {
+      setLaunchPadLoading(false);
+    }
+  }, []);
 
   const isDefaultWeights = WEIGHT_KEYS.every((k) => weights[k] === 1);
 
@@ -325,6 +470,9 @@ export default function Home() {
         )}
       </div>
 
+      {/* ── Learning Report ── */}
+      <LearningReport feedback={feedback} />
+
       {/* ── Errors ── */}
       {result?.errors && <ErrorPanel errors={result.errors} />}
 
@@ -338,21 +486,43 @@ export default function Home() {
           <div className="grid gap-4 md:grid-cols-3">
             {result.topPlans.map((plan, i) => (
               <div key={plan.id} className={`animate-fade-slide-up ${i === 1 ? "animate-delay-100" : i === 2 ? "animate-delay-200" : ""}`}>
-                <TracePlanCard plan={plan} rank={i + 1} />
+                <TracePlanCard plan={plan} rank={i + 1} onLaunchPad={handleLaunchPad} />
               </div>
             ))}
           </div>
         </section>
       )}
 
+      {/* ── Fusion Section ── */}
+      {result?.candidates && result.candidates.length > 0 && (
+        <FusionSection
+          fusions={fusionIdeas}
+          isLoading={fusionLoading}
+          onGenerate={handleFusion}
+          hasCandidates={result.candidates.filter((c) => c.gate.result !== "fail").length >= 2}
+        />
+      )}
+
       {/* ── Candidates Table ── */}
       {result?.candidates && result.candidates.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <LayoutList size={18} className="text-primary-light" />
-              Candidates ({totalFiltered} / {result.candidates.length})
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <LayoutList size={18} className="text-primary-light" />
+                Candidates ({totalFiltered} / {result.candidates.length})
+              </h2>
+              <MapControls
+                viewMode={viewMode}
+                xAxis={xAxis}
+                yAxis={yAxis}
+                colorBy={colorBy}
+                onViewModeChange={setViewMode}
+                onXChange={setXAxis}
+                onYChange={setYAxis}
+                onColorByChange={setColorBy}
+              />
+            </div>
             <div className="flex gap-2 text-xs">
               {(["all", "pass", "maybe", "fail"] as const).map((v) => (
                 <button
@@ -439,7 +609,22 @@ export default function Home() {
             </div>
           )}
 
-          <div className="overflow-x-auto">
+          {/* ── Map View ── */}
+          {viewMode === "map" && (
+            <div className="mb-4">
+              <BubbleMap
+                candidates={[...tier1, ...tier2, ...tier3]}
+                xAxis={xAxis}
+                yAxis={yAxis}
+                colorBy={colorBy}
+                selectedId={expandedId}
+                onSelect={(id) => setExpandedId(expandedId === id ? null : id)}
+              />
+            </div>
+          )}
+
+          {/* ── Table View ── */}
+          {viewMode === "table" && <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b border-border-default text-left text-text-secondary">
@@ -454,6 +639,7 @@ export default function Home() {
                   <SortableTh label="空白" sortKey="jpGap" current={sortKey} dir={sortDir} onClick={handleSort} />
                   <SortableTh label="Risk" sortKey="riskLow" current={sortKey} dir={sortDir} onClick={handleSort} />
                   <th className="py-2 pr-1 text-xs" title="深掘り再評価">DD</th>
+                  <th className="py-2 pr-1 text-xs" title="フィードバック">FB</th>
                   <SortableTh label="Total" sortKey="totalScore" current={sortKey} dir={sortDir} onClick={handleSort} />
                 </tr>
               </thead>
@@ -461,7 +647,7 @@ export default function Home() {
                 {tier1.length > 0 && (
                   <>
                     <tr>
-                      <td colSpan={12} className="pt-2 pb-1 px-1">
+                      <td colSpan={13} className="pt-2 pb-1 px-1">
                         <span className="text-[10px] font-bold text-tier1-accent uppercase tracking-wider">Tier 1 — 注目</span>
                       </td>
                     </tr>
@@ -477,6 +663,12 @@ export default function Home() {
                         weights={weights}
                         onDeepDive={handleDeepDive}
                         isDeepDiving={deepDiveLoadingId === c.id}
+                        feedbackStatus={fbStatusMap.get(c.id)}
+                        onFeedback={handleFeedback}
+                        simulation={simulationData.get(c.id)}
+                        isSimulating={simulatingId === c.id}
+                        onSimulate={handleSimulate}
+                        similarCases={similarCasesMap.get(c.id)}
                       />
                     ))}
                   </>
@@ -484,7 +676,7 @@ export default function Home() {
                 {tier2.length > 0 && (
                   <>
                     <tr>
-                      <td colSpan={12} className="pt-4 pb-1 px-1">
+                      <td colSpan={13} className="pt-4 pb-1 px-1">
                         <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Tier 2 — 候補 ({tier2.length}件)</span>
                       </td>
                     </tr>
@@ -500,6 +692,9 @@ export default function Home() {
                         weights={weights}
                         onDeepDive={handleDeepDive}
                         isDeepDiving={deepDiveLoadingId === c.id}
+                        feedbackStatus={fbStatusMap.get(c.id)}
+                        onFeedback={handleFeedback}
+                        similarCases={similarCasesMap.get(c.id)}
                       />
                     ))}
                   </>
@@ -507,7 +702,7 @@ export default function Home() {
                 {tier3.length > 0 && (
                   <>
                     <tr>
-                      <td colSpan={12} className="pt-4 pb-1 px-1">
+                      <td colSpan={13} className="pt-4 pb-1 px-1">
                         {gateFilter === "all" ? (
                           <button
                             onClick={() => setShowFailedTier((v) => !v)}
@@ -534,18 +729,30 @@ export default function Home() {
                         weights={weights}
                         onDeepDive={handleDeepDive}
                         isDeepDiving={deepDiveLoadingId === c.id}
+                        feedbackStatus={fbStatusMap.get(c.id)}
+                        onFeedback={handleFeedback}
+                        similarCases={similarCasesMap.get(c.id)}
                       />
                     ))}
                   </>
                 )}
               </tbody>
             </table>
-          </div>
+          </div>}
         </section>
       )}
 
       {/* ── Empty State ── */}
       {!loading && !result && <EmptyState />}
+
+      {/* ── LaunchPad Modal ── */}
+      {showLaunchPad && (
+        <LaunchPadPanel
+          spec={launchPadSpec}
+          isLoading={launchPadLoading}
+          onClose={() => setShowLaunchPad(false)}
+        />
+      )}
     </main>
   );
 }

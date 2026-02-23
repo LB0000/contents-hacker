@@ -1,0 +1,280 @@
+{
+  "modelVersion": "text-embedding-3-small",
+  "cases": [
+    {
+      "id": "case-001",
+      "originalProduct": "Calendly",
+      "jpTraceProduct": "TimeRex / Spir",
+      "category": "vertical-saas",
+      "outcome": "success",
+      "summary": "日程調整SaaS。日本のビジネスマナーに合わせた敬語対応UI、Googleカレンダー連携で成功。",
+      "embedding": [],
+      "yearLaunched": 2019,
+      "lessonsLearned": "日本語UIと丁寧な文面テンプレートが差別化ポイント"
+    },
+    {
+      "id": "case-002",
+      "originalProduct": "Notion",
+      "jpTraceProduct": "Notion日本展開",
+      "category": "devtool",
+      "outcome": "success",
+      "summary": "オールインワンワークスペース。日本語化と日本コミュニティ形成で急成長。MAU数百万規模。",
+      "embedding": [],
+      "yearLaunched": 2020,
+      "lessonsLearned": "コミュニティ主導の普及戦略が有効"
+    },
+    {
+      "id": "case-003",
+      "originalProduct": "Zapier",
+      "jpTraceProduct": "IFTTT日本版 / Make",
+      "category": "info-gap-ai",
+      "outcome": "ongoing",
+      "summary": "ノーコード自動化。日本では企業のDXリテラシーが低く、教育コストが課題。",
+      "embedding": [],
+      "yearLaunched": 2021,
+      "lessonsLearned": "テンプレートの充実と日本語ドキュメントが鍵"
+    },
+    {
+      "id": "case-004",
+      "originalProduct": "Shopify",
+      "jpTraceProduct": "BASE / STORES",
+      "category": "ec-optimize",
+      "outcome": "success",
+      "summary": "EC構築プラットフォーム。日本の決済事情（コンビニ払い・銀行振込）対応が勝因。",
+      "embedding": [],
+      "yearLaunched": 2016,
+      "lessonsLearned": "日本固有の決済手段対応が必須"
+    },
+    {
+      "id": "case-005",
+      "originalProduct": "Stripe",
+      "jpTraceProduct": "PAY.JP / GMOペイメント",
+      "category": "ec-optimize",
+      "outcome": "success",
+      "summary": "開発者向け決済API。日本の規制対応（資金決済法）とドキュメント日本語化で普及。",
+      "embedding": [],
+      "yearLaunched": 2016,
+      "lessonsLearned": "規制対応と日本語APIドキュメントが参入障壁"
+    },
+    {
+      "id": "case-006",
+      "originalProduct": "Figma",
+      "jpTraceProduct": "Figma日本展開",
+      "category": "devtool",
+      "outcome": "success",
+      "summary": "コラボレーションデザインツール。日本のデザインチームに浸透、Adobe XDから移行。",
+      "embedding": [],
+      "yearLaunched": 2020,
+      "lessonsLearned": "チーム利用の口コミ効果が大きい"
+    },
+    {
+      "id": "case-007",
+      "originalProduct": "Loom",
+      "jpTraceProduct": "Loom日本参入",
+      "category": "vertical-saas",
+      "outcome": "failure",
+      "summary": "動画メッセージツール。日本のビジネス文化では対面・テキスト重視で動画メッセージが浸透せず。",
+      "embedding": [],
+      "yearLaunched": 2021,
+      "lessonsLearned": "日本では非同期動画よりテキストコミュニケーションが主流"
+    },
+    {
+      "id": "case-008",
+      "originalProduct": "Clubhouse",
+      "jpTraceProduct": "Clubhouse日本ブーム",
+      "category": "marketplace",
+      "outcome": "failure",
+      "summary": "音声SNS。日本で一時的にブームになるも、匿名文化と競合（Twitter Spaces）に敗退。",
+      "embedding": [],
+      "yearLaunched": 2021,
+      "lessonsLearned": "日本ではブーム→急速離脱のパターンに注意"
+    },
+    {
+      "id": "case-009",
+      "originalProduct": "Canva",
+      "jpTraceProduct": "Canva日本展開",
+      "category": "info-gap-ai",
+      "outcome": "success",
+      "summary": "ノンデザイナー向けデザインツール。日本語テンプレートと年賀状機能で一般層に浸透。",
+      "embedding": [],
+      "yearLaunched": 2017,
+      "lessonsLearned": "日本特有のユースケース（年賀状等）への対応が効果的"
+    },
+    {
+      "id": "case-010",
+      "originalProduct": "Grammarly",
+      "jpTraceProduct": "日本語文章校正",
+      "category": "ai-tool",
+      "outcome": "failure",
+      "summary": "AI文章校正。日本語は英語より文法チェックが難しく、精度不足で普及せず。",
+      "embedding": [],
+      "yearLaunched": 2022,
+      "lessonsLearned": "日本語NLPの精度が英語より低く、品質が参入障壁"
+    },
+    {
+      "id": "case-011",
+      "originalProduct": "Trello",
+      "jpTraceProduct": "Trello / Jooto",
+      "category": "vertical-saas",
+      "outcome": "success",
+      "summary": "カンバンタスク管理。シンプルUIが日本の中小企業に受け入れられた。",
+      "embedding": [],
+      "yearLaunched": 2014,
+      "lessonsLearned": "シンプルさと無料プランが日本の中小企業に有効"
+    },
+    {
+      "id": "case-012",
+      "originalProduct": "Airtable",
+      "jpTraceProduct": "kintone",
+      "category": "info-gap-ai",
+      "outcome": "success",
+      "summary": "ノーコードDB/業務アプリ。日本ではサイボウズkintoneが先行し大きなシェアを確保。",
+      "embedding": [],
+      "yearLaunched": 2014,
+      "lessonsLearned": "日本の商習慣に合ったカスタマイズ性が重要"
+    },
+    {
+      "id": "case-013",
+      "originalProduct": "Typeform",
+      "jpTraceProduct": "formrun / Tayori",
+      "category": "vertical-saas",
+      "outcome": "success",
+      "summary": "フォーム/アンケートSaaS。日本ではformrunなど国産ツールが台頭。",
+      "embedding": [],
+      "yearLaunched": 2018,
+      "lessonsLearned": "フォームは日本語UI・日本の個人情報保護法対応が必須"
+    },
+    {
+      "id": "case-014",
+      "originalProduct": "Segment",
+      "jpTraceProduct": "KARTE / Treasure Data",
+      "category": "devtool",
+      "outcome": "ongoing",
+      "summary": "顧客データ基盤CDP。日本ではKARTE等が先行、エンプラ向けのため個人開発には不向き。",
+      "embedding": [],
+      "yearLaunched": 2018,
+      "lessonsLearned": "エンプラ向けSaaSは個人開発でのトレースが困難"
+    },
+    {
+      "id": "case-015",
+      "originalProduct": "Gumroad",
+      "jpTraceProduct": "note / BOOTH",
+      "category": "marketplace",
+      "outcome": "success",
+      "summary": "デジタルコンテンツ販売。日本ではnoteやBOOTHがクリエイターエコノミーを形成。",
+      "embedding": [],
+      "yearLaunched": 2014,
+      "lessonsLearned": "クリエイター文化が強い日本では需要が高い"
+    },
+    {
+      "id": "case-016",
+      "originalProduct": "Substack",
+      "jpTraceProduct": "note / theLetter",
+      "category": "marketplace",
+      "outcome": "ongoing",
+      "summary": "ニュースレターSaaS。日本ではnoteが近い機能を持ち、専用サービスの需要は限定的。",
+      "embedding": [],
+      "yearLaunched": 2022,
+      "lessonsLearned": "既存プラットフォーム（note）との差別化が課題"
+    },
+    {
+      "id": "case-017",
+      "originalProduct": "Linear",
+      "jpTraceProduct": "Linear日本利用",
+      "category": "devtool",
+      "outcome": "ongoing",
+      "summary": "高速プロジェクト管理。日本のスタートアップで採用が増加中だが、まだ英語UI依存。",
+      "embedding": [],
+      "yearLaunched": 2023,
+      "lessonsLearned": "開発者向けツールは英語UIでも受け入れられる場合がある"
+    },
+    {
+      "id": "case-018",
+      "originalProduct": "Midjourney",
+      "jpTraceProduct": "AI画像生成（日本利用）",
+      "category": "ai-tool",
+      "outcome": "success",
+      "summary": "AI画像生成。日本のクリエイター・同人文化と相性が良く急速に普及。",
+      "embedding": [],
+      "yearLaunched": 2022,
+      "lessonsLearned": "日本のイラスト・同人文化との親和性が高い"
+    },
+    {
+      "id": "case-019",
+      "originalProduct": "Vercel",
+      "jpTraceProduct": "Vercel日本展開",
+      "category": "devtool",
+      "outcome": "success",
+      "summary": "Next.jsホスティング。日本の開発者コミュニティで自然に普及。日本語ドキュメントも充実。",
+      "embedding": [],
+      "yearLaunched": 2020,
+      "lessonsLearned": "開発者ツールはコミュニティ駆動で広がる"
+    },
+    {
+      "id": "case-020",
+      "originalProduct": "Uber Eats",
+      "jpTraceProduct": "出前館",
+      "category": "analog-dx",
+      "outcome": "success",
+      "summary": "フードデリバリー。出前館は日本市場を先行して獲得。日本の住所体系対応が差別化。",
+      "embedding": [],
+      "yearLaunched": 2016,
+      "lessonsLearned": "日本の住所体系（番地・マンション名）への対応が重要"
+    },
+    {
+      "id": "case-021",
+      "originalProduct": "Superhuman",
+      "jpTraceProduct": "なし（日本展開なし）",
+      "category": "vertical-saas",
+      "outcome": "failure",
+      "summary": "高速メールクライアント。月$30の価格設定が日本では受け入れられず。Gmail/Outlookで十分。",
+      "embedding": [],
+      "yearLaunched": 2023,
+      "lessonsLearned": "日本では無料代替品がある場合、高価格SaaSは厳しい"
+    },
+    {
+      "id": "case-022",
+      "originalProduct": "Jasper AI",
+      "jpTraceProduct": "Catchy / AIライティング",
+      "category": "ai-tool",
+      "outcome": "ongoing",
+      "summary": "AIコピーライティング。日本語対応は進むも、ChatGPTとの差別化が課題。",
+      "embedding": [],
+      "yearLaunched": 2023,
+      "lessonsLearned": "汎用AIとの差別化にはドメイン特化が必要"
+    },
+    {
+      "id": "case-023",
+      "originalProduct": "Deel",
+      "jpTraceProduct": "日本のHRテック",
+      "category": "vertical-saas",
+      "outcome": "ongoing",
+      "summary": "グローバル給与・契約管理。日本の労働法・社会保険制度の複雑さが参入障壁。",
+      "embedding": [],
+      "yearLaunched": 2023,
+      "lessonsLearned": "日本の労働法規制への対応は専門知識が必要"
+    },
+    {
+      "id": "case-024",
+      "originalProduct": "Retool",
+      "jpTraceProduct": "内製ツール系",
+      "category": "info-gap-ai",
+      "outcome": "ongoing",
+      "summary": "ローコード内部ツール構築。日本のエンプラDX需要は高いが、導入ハードルも高い。",
+      "embedding": [],
+      "yearLaunched": 2022,
+      "lessonsLearned": "日本企業のIT部門への営業力が必要"
+    },
+    {
+      "id": "case-025",
+      "originalProduct": "Plausible Analytics",
+      "jpTraceProduct": "日本のプライバシー重視アナリティクス",
+      "category": "devtool",
+      "outcome": "ongoing",
+      "summary": "プライバシー重視Web解析。日本でもGA4への不満から注目度上昇中。",
+      "embedding": [],
+      "yearLaunched": 2023,
+      "lessonsLearned": "個人情報保護法の厳格化が追い風"
+    }
+  ]
+}
